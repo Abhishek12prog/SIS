@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard - SIS</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f6f9;
+        }
+
+        /* ===== TOP BAR ===== */
+        .topbar {
+            height: 60px;
+            background: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            height: 40px;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 240px;
+            height: 100vh;
+            background: #2f3b4c;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            overflow-y: auto;
+            padding-top: 20px;
+        }
+
+        .sidebar a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: #d1d5db;
+            text-decoration: none;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        .sidebar a:hover {
+            background: #3a475a;
+            color: white;
+        }
+
+        .sidebar a.active {
+            background: #ffffff20;
+            color: white;
+        }
+
+        .sidebar i {
+            margin-right: 10px;
+        }
+
+        /* ===== CONTENT ===== */
+        .content {
+            margin-left: 240px;
+            margin-top: 60px;
+            padding: 30px;
+        }
+
+    </style>
+
+    <!-- ICON LIBRARY -->
+    <script src="https://kit.fontawesome.com/yourkit.js" crossorigin="anonymous"></script>
+
+</head>
+<body>
+
+    <!-- ===== TOP NAVBAR ===== -->
+    <div class="topbar">
+        <img src="{{ url_for('static', filename='images/ifhe-Logo.svg') }}" class="logo">
+        <a href="{{ url_for('student_logout') }}">Logout</a>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar">
+
+        <a href="{{ url_for('documents') }}"><i>📄</i>Documents</a>
+        <a href="{{ url_for('student_announcements') }}"><i>📢</i>Announcements</a>
+        <a href="#"><i>📌</i>Notice Board</a>
+        <a href="{{ url_for('feedback') }}"><i>💬</i>Feedback</a>
+        <a href="{{ url_for('my_info') }}"><i>👤</i>My Info</a>
+        <a href="#"><i>🏦</i>Bank Loan</a>
+        <a href="{{ url_for('fees') }}"><i>💰</i>Fee</a>
+        <a href="{{ url_for('academics') }}"><i>📘</i>Academics</a>
+        <a href="{{ url_for('hall_ticket') }}"><i>🎫</i>Hall Ticket</a>
+        <a href="#"><i>📝</i>Examinations</a>
+        <a href="{{ url_for('helpdesk') }}"><i>🎧</i>Help Desk</a>
+        <a href="#"><i>📈</i>Activities</a>
+        <a href="#"><i>📦</i>Resources</a>
+        <a href="#"><i>⬇</i>Downloads</a>
+        <a href="#"><i>📚</i>Library</a>
+        <a href="#"><i>💡</i>IIC</a>
+        <a href="{{ url_for('change_password') }}"><i>🔑</i>Change Password</a>
+
+    </div>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <div class="content">
+        {% block content %}
+        <h2>Welcome to Student Portal</h2>
+        {% endblock %}
+    </div>
+
+</body>
+</html>

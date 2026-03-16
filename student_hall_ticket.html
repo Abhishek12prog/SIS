@@ -1,0 +1,40 @@
+{% extends "base_student.html" %}
+{% block content %}
+
+<div style="background:white;padding:30px;border:1px solid #ccc;">
+
+<h2 style="text-align:center;">IFHE Examination Hall Ticket</h2>
+<hr>
+
+<p><strong>Name:</strong> {{ student[0] }}</p>
+<p><strong>Branch:</strong> {{ student[1] }}</p>
+
+<br>
+
+<table border="1" cellpadding="10" style="width:100%;">
+    <tr style="background:#1f2933; color:white;">
+        <th>Subject</th>
+        <th>Exam Date</th>
+        <th>Exam Time</th>
+    </tr>
+
+    {% for s in subjects %}
+    <tr>
+        <td>{{ s[0] }}</td>
+        <td>{{ s[1] }}</td>
+        <td>{{ s[2] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br><br>
+
+<p><strong>Signature:</strong> ______________________</p>
+
+<br>
+
+<button onclick="window.print()">Print Hall Ticket</button>
+
+</div>
+
+{% endblock %}

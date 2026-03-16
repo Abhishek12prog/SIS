@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IFHE Admin Dashboard</title>
+    <style>
+    body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background-color: #f2f2f2;
+    }
+
+    
+    .topbar {
+        height: 60px;
+        background-color: #ffffff;
+        color: #2f3e4e;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        border-bottom: 1px solid #dcdcdc;
+    }
+
+    .topbar img {
+        height: 38px;
+    }
+
+    .topbar span {
+        margin-left: 12px;
+        font-size: 17px;
+        font-weight: 600;
+    }
+
+    .topbar a {
+        margin-left: auto;
+        color: #2f3e4e;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    
+    .sidebar {
+        width: 260px;
+        height: calc(100vh - 60px);
+        background-color: #2f3e4e;   
+        position: fixed;
+        top: 60px;
+        left: 0;
+        padding-top: 8px;
+        overflow-y: auto;
+    }
+
+    .sidebar a {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: #e6edf3;
+        text-decoration: none;
+        font-size: 14.5px;
+        border-left: 4px solid transparent;
+    }
+
+    .sidebar a:hover {
+        background-color: #3a4b5c;
+    }
+
+    .sidebar a.active {
+        background-color: #22313f;
+        border-left: 4px solid #ffffff;
+    }
+
+    .sidebar span {
+        margin-left: 12px;
+    }
+
+  
+    .content {
+        margin-left: 260px;
+        margin-top: 60px;
+        padding: 20px;
+        background-color: #f2f2f2;
+        min-height: calc(100vh - 60px);
+    }
+</style>
+
+</head>
+<body>
+
+
+<div class="topbar">
+    <img src="{{ url_for('static', filename='images/ifhe-Logo.svg') }}" alt="IFHE Logo">
+    <span>IFHE Admin Panel</span>
+    <a href="{{ url_for('admin_logout') }}">Logout</a>
+</div>
+
+
+<div class="sidebar">
+    <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('students') }}">Students</a>
+    <a href="{{ url_for('add_student') }}">Add Student</a>
+    <a href="{{ url_for('branches') }}">Branches</a>
+    <a href="{{ url_for('upload_data') }}">Upload Data</a>
+    <a href="{{ url_for('documents') }}">Documents</a>
+    <a href="{{ url_for('announcements') }}">Announcements</a>
+    <a href="{{ url_for('reports') }}">Reports</a>
+    <a href="{{ url_for('admin_helpdesk') }}">Help Desk</a>
+    <a href="{{ url_for('view_feedback') }}">View Feedback</a>
+</div>
+
+
+<div class="content">
+    {% block content %}
+    <h2>Welcome Admin</h2>
+    <p>Select an option from the sidebar.</p>
+    {% endblock %}
+</div>
+
+</body>
+</html>

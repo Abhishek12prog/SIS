@@ -1,0 +1,26 @@
+{% extends "base_student.html" %}
+{% block content %}
+
+<h2>Academic Records</h2>
+
+<table border="1" cellpadding="10" style="width:100%; background:white;">
+    <tr style="background:#1f2933; color:white;">
+        <th>Subject</th>
+        <th>Internal</th>
+        <th>External</th>
+        <th>Total</th>
+        <th>Semester</th>
+    </tr>
+
+    {% for r in records %}
+    <tr>
+        <td>{{ r[0] }}</td>
+        <td>{{ r[1] }}</td>
+        <td>{{ r[2] }}</td>
+        <td>{{ r[3] }}</td>
+        <td>{{ r[4] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

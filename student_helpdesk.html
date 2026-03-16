@@ -1,0 +1,36 @@
+{% extends "base_student.html" %}
+{% block content %}
+
+<h2>Help Desk</h2>
+
+<h3>Raise New Ticket</h3>
+
+<form method="POST">
+    <input type="text" name="subject" placeholder="Subject" required style="width:100%;"><br><br>
+    <textarea name="description" rows="4" placeholder="Describe your issue..." required style="width:100%;"></textarea><br><br>
+    <button type="submit">Submit Ticket</button>
+</form>
+
+<hr><br>
+
+<h3>My Tickets</h3>
+
+<table border="1" cellpadding="10" style="width:100%; background:white;">
+    <tr style="background:#1f2933; color:white;">
+        <th>Subject</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Date</th>
+    </tr>
+
+    {% for t in tickets %}
+    <tr>
+        <td>{{ t[0] }}</td>
+        <td>{{ t[1] }}</td>
+        <td>{{ t[2] }}</td>
+        <td>{{ t[3] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

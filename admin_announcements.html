@@ -1,0 +1,28 @@
+{% extends "base_admin.html" %}
+{% block content %}
+
+<h2>All Announcements</h2>
+
+<a href="{{ url_for('add_announcement') }}">
+    <button>Add New Announcement</button>
+</a>
+
+<br><br>
+
+<table border="1" cellpadding="10" style="width:100%; background:white;">
+    <tr style="background:#1f2933; color:white;">
+        <th>Title</th>
+        <th>Content</th>
+        <th>Date</th>
+    </tr>
+
+    {% for a in announcements %}
+    <tr>
+        <td>{{ a[1] }}</td>
+        <td>{{ a[2] }}</td>
+        <td>{{ a[3] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base_admin.html" %}
+{% block content %}
+
+<h2>Student Feedback</h2>
+
+{% for f in feedbacks %}
+<div style="background:white;padding:15px;margin-bottom:10px;">
+    <strong>{{ f[0] }}</strong><br>
+    <p>{{ f[1] }}</p>
+    <small>{{ f[2] }}</small>
+</div>
+{% endfor %}
+
+{% endblock %}
