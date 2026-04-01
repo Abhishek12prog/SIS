@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Courses</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            margin: 0;
+            padding: 20px;
+            color: white;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .info {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #cbd5f5;
+        }
+
+        /* COLUMN STYLE */
+        .courses-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .course-card {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            padding: 15px 20px;
+            border-radius: 12px;
+            transition: 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .course-card:hover {
+            transform: translateX(8px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+        }
+
+        .course-title {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* Optional small arrow */
+        .arrow {
+            font-size: 18px;
+            color: #38bdf8;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<h2>📚 My Courses</h2>
+
+<div class="info">
+    <p>Branch: {{ student.branch }} | Semester: {{ sem }}</p>
+</div>
+
+<div class="courses-container">
+    {% for sub in subjects %}
+    <div class="course-card">
+        <div class="course-title">{{ sub.subject_name }}</div>
+        <div class="arrow">→</div>
+    </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>

@@ -1,0 +1,34 @@
+{% extends "base_student.html" %}
+
+{% block content %}
+
+<h2>Notice Board</h2>
+
+<table border="1" width="100%">
+<tr>
+    <th>S#</th>
+    <th>Notice</th>
+    <th>Date</th>
+</tr>
+
+{% for n in notices %}
+<tr>
+    <td>{{ loop.index }}</td>
+
+    <td>
+        {% if n[3] %}
+            <a href="{{ url_for('static', filename='uploads/' + n[3]) }}" target="_blank">
+                {{ n[1] }}
+            </a>
+        {% else %}
+            {{ n[1] }}
+        {% endif %}
+    </td>
+
+    <td>{{ n[4] }}</td>
+</tr>
+{% endfor %}
+
+</table>
+
+{% endblock %}

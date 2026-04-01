@@ -1,0 +1,82 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<style>
+    .notice-form-container {
+        max-width: 500px;
+        margin: 40px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .form-title {
+        text-align: center;
+        font-size: 22px;
+        margin-bottom: 20px;
+        color: #1f2933;
+    }
+
+    label {
+        font-weight: 500;
+        color: #374151;
+    }
+
+    input[type="text"],
+    textarea,
+    input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        margin-top: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    textarea {
+        resize: none;
+        height: 100px;
+    }
+
+    button {
+        width: 100%;
+        padding: 10px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 15px;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+
+    button:hover {
+        background: #1e40af;
+    }
+</style>
+
+<div class="notice-form-container">
+
+    <div class="form-title">📢 Add Notice</div>
+
+    <form method="POST" enctype="multipart/form-data">
+
+        <label>Title:</label>
+        <input type="text" name="title" required>
+
+        <label>Description:</label>
+        <textarea name="description"></textarea>
+
+        <label>Upload File:</label>
+        <input type="file" name="file">
+
+        <button type="submit">Add Notice</button>
+
+    </form>
+
+</div>
+
+{% endblock %}

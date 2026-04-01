@@ -1,0 +1,64 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<style>
+    .branch-container {
+        padding: 20px;
+    }
+
+    .branch-title {
+        font-size: 24px;
+        margin-bottom: 20px;
+        color: #1f2933;
+    }
+
+    .branch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .branch-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        transition: 0.3s;
+        cursor: pointer;
+    }
+
+    .branch-card:hover {
+        transform: translateY(-5px);
+        background: #2563eb;
+        color: white;
+    }
+
+    .branch-card a {
+        text-decoration: none;
+        color: inherit;
+        font-weight: bold;
+        font-size: 18px;
+    }
+</style>
+
+<div class="branch-container">
+
+    <div class="branch-title">📚 Branches</div>
+
+    <div class="branch-grid">
+
+        {% for branch in branches %}
+        <div class="branch-card">
+            <a href="{{ url_for('branch_students', branch_name=branch[0]) }}">
+                {{ branch[0] }}
+            </a>
+        </div>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+{% endblock %}

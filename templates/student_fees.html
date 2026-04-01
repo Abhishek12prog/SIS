@@ -1,0 +1,26 @@
+{% extends "base_student.html" %}
+{% block content %}
+
+<h2>Fee Details</h2>
+
+<table border="1" cellpadding="10" style="width:100%; background:white;">
+    <tr style="background:#1f2933; color:white;">
+        <th>Semester</th>
+        <th>Total Fee</th>
+        <th>Paid Amount</th>
+        <th>Due Amount</th>
+        <th>Status</th>
+    </tr>
+
+    {% for f in fee_records %}
+    <tr>
+        <td>{{ f[0] }}</td>
+        <td>{{ f[1] }}</td>
+        <td>{{ f[2] }}</td>
+        <td>{{ f[3] }}</td>
+        <td>{{ f[4] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

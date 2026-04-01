@@ -1,0 +1,38 @@
+{% extends "base_admin.html" %}
+{% block content %}
+
+<h2>Help Desk Tickets</h2>
+
+<table border="1" cellpadding="10" style="width:100%; background:white;">
+    <tr style="background:#1f2933; color:white;">
+        <th>ID</th>
+        <th>Student</th>
+        <th>Subject</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Update</th>
+    </tr>
+
+    {% for t in tickets %}
+    <tr>
+        <td>{{ t[0] }}</td>
+        <td>{{ t[1] }}</td>
+        <td>{{ t[2] }}</td>
+        <td>{{ t[3] }}</td>
+        <td>{{ t[4] }}</td>
+        <td>
+            <form method="POST">
+                <input type="hidden" name="ticket_id" value="{{ t[0] }}">
+                <select name="status">
+                    <option>Open</option>
+                    <option>In Progress</option>
+                    <option>Resolved</option>
+                </select>
+                <button type="submit">Update</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

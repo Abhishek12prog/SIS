@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard - SIS</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f6f9;
+        }
+
+        /* ===== TOP BAR ===== */
+        .topbar {
+            height: 60px;
+            background: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            height: 40px;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 240px;
+            height: 100vh;
+            background: #2f3b4c;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            overflow-y: auto;
+            padding-top: 20px;
+        }
+
+        .sidebar a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: #d1d5db;
+            text-decoration: none;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        .sidebar a:hover {
+            background: #3a475a;
+            color: white;
+        }
+
+        .sidebar a.active {
+            background: #ffffff20;
+            color: white;
+        }
+
+        /* ===== ACADEMICS DROPDOWN ===== */
+        .menu-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            color: #d1d5db;
+            cursor: pointer;
+        }
+
+        .menu-title:hover {
+            background: #3a475a;
+            color: white;
+        }
+
+        .submenu {
+            display: none;
+            background: #263240;
+        }
+
+        .submenu a {
+            padding: 10px 40px;
+            font-size: 13px;
+            color: #cfd8dc;
+        }
+
+        .submenu a:hover {
+            color: white;
+        }
+
+        /* ===== CONTENT ===== */
+        .content {
+            margin-left: 240px;
+            margin-top: 60px;
+            padding: 30px;
+        }
+
+    </style>
+
+</head>
+<body>
+
+    <!-- ===== TOP NAVBAR ===== -->
+    <div class="topbar">
+        <img src="{{ url_for('static', filename='images/ifhe-Logo.svg') }}" class="logo">
+        <a href="{{ url_for('student_logout') }}">Logout</a>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar">
+
+       <a href="{{ url_for('student_documents') }}">📄 Documents</a>
+        <a href="{{ url_for('student_announcements') }}">📢 Announcements</a>
+        <a href="{{ url_for('student_notice') }}"><i>📌</i>Notice Board</a>
+        <a href="{{ url_for('feedback') }}">💬 Feedback</a>
+        <a href="{{ url_for('my_info') }}">👤 My Info</a>
+        <a href="#">🏦 Bank Loan</a>
+        <a href="{{ url_for('fees') }}">💰 Fee</a>
+
+        <!-- ===== ACADEMICS DROPDOWN ===== -->
+        <div class="menu-title" onclick="toggleAcademics()">
+            <span>📘 Academics</span>
+            <span id="arrow">▶</span>
+        </div>
+
+        <div id="academicsMenu" class="submenu">
+            <a href="{{ url_for('registration') }}">Registration</a>
+            <a href="{{ url_for('courses') }}">Courses</a>
+            <a href="{{ url_for('faculty') }}">My Faculty</a>
+            <a href="{{ url_for('attendance') }}">My Attendance</a>
+            <a href="{{ url_for('student_documents') }}">Documents</a>
+            <a href="{{ url_for('resources') }}">Resources</a>
+            <a href="{{ url_for('mentor') }}">Mentor</a>
+            <a href="{{ url_for('marks') }}">Consolidated Marks List</a>
+            <a href="{{ url_for('grades') }}">Grade List</a>
+        </div>
+
+        <a href="{{ url_for('hall_ticket') }}">🎫 Hall Ticket</a>
+        <a href="{{ url_for('student_examinations') }}"><i>📝</i>Examinations</a>
+        <a href="{{ url_for('helpdesk') }}">🎧 Help Desk</a>
+        <a href="#">📈 Activities</a>
+        <a href="#">📦 Resources</a>
+        <a href="#">⬇ Downloads</a>
+        <a href="#">📚 Library</a>
+        <a href="#">💡 IIC</a>
+        <a href="{{ url_for('change_password') }}">🔑 Change Password</a>
+
+    </div>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <div class="content">
+        {% block content %}
+        <h2>Welcome to Student Portal</h2>
+        {% endblock %}
+    </div>
+
+    <!-- ===== JAVASCRIPT ===== -->
+    <script>
+        function toggleAcademics() {
+            const menu = document.getElementById("academicsMenu");
+            const arrow = document.getElementById("arrow");
+
+            if (menu.style.display === "block") {
+                menu.style.display = "none";
+                arrow.innerHTML = "▶";
+            } else {
+                menu.style.display = "block";
+                arrow.innerHTML = "▼";
+            }
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,74 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<style>
+    .form-container {
+        max-width: 500px;
+        background: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    input {
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    button {
+        background: #2563eb;
+        color: white;
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        width: 100%;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #1e40af;
+    }
+</style>
+
+<div class="form-container">
+
+<h2>Edit Student</h2>
+
+<form method="POST">
+
+    <label>Name:</label>
+    <input type="text" name="name" value="{{ student[1] }}" required>
+
+    <label>Email:</label>
+    <input type="email" name="email" value="{{ student[2] }}">
+
+    <label>Branch:</label>
+    <input type="text" name="branch" value="{{ student[3] }}">
+
+    <label>Username:</label>
+    <input type="text" name="username" value="{{ student[4] }}"> 
+
+    <label>Year:</label>
+    <input type="number" name="year" value="{{ student[6] }}">
+
+    <label>Semester:</label>
+    <input type="number" name="semester" value="{{ student[7] }}">
+
+    <label>Course Type:</label>
+    <input type="text" name="course_type" value="{{ student[9] }}">
+
+    <label>Phone:</label>
+    <input type="text" name="phone" value="{{ student[10] }}">
+
+    <br><br>
+    <button type="submit">Update Student</button>
+
+</form>
+
+</div>
+
+{% endblock %}

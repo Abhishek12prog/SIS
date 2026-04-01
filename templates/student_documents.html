@@ -1,0 +1,83 @@
+{% extends "base_student.html" %}
+
+{% block content %}
+
+<style>
+    /* ONLY affects this page */
+    .documents-page {
+        padding: 20px;
+    }
+
+    .documents-page h2 {
+        font-size: 24px;
+        margin-bottom: 20px;
+        color: #1f2933;
+    }
+
+    .documents-page table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .documents-page th,
+    .documents-page td {
+        padding: 12px;
+        text-align: center;
+    }
+
+    .documents-page th {
+        background: #2f3b4c;
+        color: white;
+    }
+
+    .documents-page tr:nth-child(even) {
+        background: #f4f6f9;
+    }
+
+    .documents-page tr:hover {
+        background: #e5e7eb;
+    }
+
+    .documents-page a {
+        text-decoration: none;
+        background: #2563eb;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+
+    .documents-page a:hover {
+        background: #1e40af;
+    }
+</style>
+
+<div class="documents-page">
+
+    <h2>📄 Documents</h2>
+
+    <table>
+        <tr>
+            <th>Title</th>
+            <th>Action</th>
+        </tr>
+
+        {% for doc in docs %}
+        <tr>
+            <td>{{ doc[1] }}</td>
+            <td>
+                <a href="{{ url_for('static', filename='uploads/' + doc[2]) }}" target="_blank">
+                    View
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</div>
+
+{% endblock %}

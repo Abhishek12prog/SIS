@@ -1,0 +1,63 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<style>
+    .announce-container {
+        padding: 20px;
+    }
+
+    .announce-title {
+        font-size: 22px;
+        margin-bottom: 20px;
+    }
+
+    .card {
+        background: white;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+    }
+
+    .card h4 {
+        margin: 0;
+        color: #2563eb;
+    }
+
+    .card p {
+        margin: 5px 0;
+    }
+
+    .add-btn {
+        display: inline-block;
+        margin-bottom: 20px;
+        padding: 8px 12px;
+        background: #2563eb;
+        color: white;
+        border-radius: 5px;
+        text-decoration: none;
+    }
+
+    .add-btn:hover {
+        background: #1e40af;
+    }
+</style>
+
+<div class="announce-container">
+
+    <div class="announce-title">📢 Announcements</div>
+
+    <a href="{{ url_for('add_announcement') }}" class="add-btn">+ Add Announcement</a>
+
+    {% for a in announcements %}
+    <div class="card">
+        <h4>{{ a[1] }}</h4>
+        <p>{{ a[2] }}</p>
+        <small>{{ a[3] }}</small>
+    </div>
+    {% endfor %}
+
+</div>
+
+{% endblock %}

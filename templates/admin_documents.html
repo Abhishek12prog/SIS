@@ -1,0 +1,75 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<style>
+    .doc-container {
+        padding: 20px;
+    }
+
+    .doc-title {
+        font-size: 22px;
+        margin-bottom: 20px;
+        color: #1f2933;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+        padding: 12px;
+        text-align: center;
+    }
+
+    th {
+        background: #1f2933;
+        color: white;
+    }
+
+    tr:nth-child(even) {
+        background: #f4f6f9;
+    }
+
+    a {
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="doc-container">
+
+    <div class="doc-title">📄 Uploaded Documents</div>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>File</th>
+            <th>Download</th>
+        </tr>
+
+        {% for doc in docs %}
+        <tr>
+            <td>{{ doc[0] }}</td>
+            <td>{{ doc[1] }}</td>
+            <td>{{ doc[2] }}</td>
+            <td>
+                <a href="{{ url_for('static', filename='uploads/' + doc[2]) }}" download>
+                    ⬇ Download
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</div>
+
+{% endblock %}

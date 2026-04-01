@@ -1,0 +1,62 @@
+{% extends "base_admin.html" %}
+{% block content %}
+
+<h2>Admin Dashboard</h2>
+<br>
+
+<!-- ================= STAT CARDS ================= -->
+<div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:30px;">
+
+    <div style="background:#2563eb;color:white;padding:20px;border-radius:8px;width:220px;">
+        <h3>Total Students</h3>
+        <h1>{{ total_students }}</h1>
+    </div>
+
+    <div style="background:#16a34a;color:white;padding:20px;border-radius:8px;width:220px;">
+        <h3>Announcements</h3>
+        <h1>{{ total_announcements }}</h1>
+    </div>
+
+    <div style="background:#dc2626;color:white;padding:20px;border-radius:8px;width:220px;">
+        <h3>Feedback</h3>
+        <h1>{{ total_feedback }}</h1>
+    </div>
+
+    <div style="background:#f59e0b;color:white;padding:20px;border-radius:8px;width:220px;">
+        <h3>Helpdesk Tickets</h3>
+        <h1>{{ total_tickets }}</h1>
+    </div>
+
+</div>
+
+<hr>
+
+<!-- ================= BRANCH SECTION ================= -->
+<h3>Branch-wise Student Count</h3>
+<br>
+
+<div style="background:white;padding:25px;border-radius:8px;">
+
+    {% if branch_data %}
+        {% for branch in branch_data %}
+            <p>
+                <strong>{{ branch[0] }}</strong>
+                ({{ branch[1] }} Students)
+            </p>
+
+            <div style="background:#e5e7eb;height:20px;border-radius:5px;margin-bottom:15px;">
+                <div style="
+                    background:#2563eb;
+                    width: {{ branch[1] * 30 }}px;
+                    height:20px;
+                    border-radius:5px;">
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No branch data available.</p>
+    {% endif %}
+
+</div>
+
+{% endblock %}

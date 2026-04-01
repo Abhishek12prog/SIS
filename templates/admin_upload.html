@@ -1,0 +1,64 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<style>
+    .upload-container {
+        max-width: 500px;
+        margin: 30px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .upload-title {
+        font-size: 22px;
+        margin-bottom: 20px;
+        text-align: center;
+        color: #1f2933;
+    }
+
+    input, textarea {
+        width: 100%;
+        padding: 10px;
+        margin-top: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+    }
+
+    button {
+        width: 100%;
+        padding: 10px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #1e40af;
+    }
+</style>
+
+<div class="upload-container">
+
+    <div class="upload-title">📤 Upload Document</div>
+
+    <form method="POST" enctype="multipart/form-data">
+
+        <label>Title</label>
+        <input type="text" name="title" required>
+
+        <label>Select File</label>
+        <input type="file" name="file" required>
+
+        <button type="submit">Upload</button>
+
+    </form>
+
+</div>
+
+{% endblock %}

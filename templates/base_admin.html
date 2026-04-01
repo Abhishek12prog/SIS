@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IFHE Admin Dashboard</title>
+    <style>
+    body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background-color: #f2f2f2;
+    }
+
+    .topbar {
+        height: 60px;
+        background-color: #ffffff;
+        color: #2f3e4e;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        border-bottom: 1px solid #dcdcdc;
+    }
+
+    .topbar img {
+        height: 38px;
+    }
+
+    .topbar span {
+        margin-left: 12px;
+        font-size: 17px;
+        font-weight: 600;
+    }
+
+    .topbar a {
+        margin-left: auto;
+        color: #2f3e4e;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .sidebar {
+        width: 260px;
+        height: calc(100vh - 60px);
+        background-color: #2f3e4e;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        padding-top: 8px;
+        overflow-y: auto;
+    }
+
+    .sidebar a {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: #e6edf3;
+        text-decoration: none;
+        font-size: 14.5px;
+        border-left: 4px solid transparent;
+    }
+
+    .sidebar a:hover {
+        background-color: #3a4b5c;
+    }
+
+    .sidebar a.active {
+        background-color: #22313f;
+        border-left: 4px solid #ffffff;
+    }
+
+    .sidebar span {
+        margin-left: 12px;
+    }
+
+    .content {
+        margin-left: 260px;
+        margin-top: 60px;
+        padding: 20px;
+        background-color: #f2f2f2;
+        min-height: calc(100vh - 60px);
+    }
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+    <img src="{{ url_for('static', filename='images/ifhe-Logo.svg') }}">
+    <span>IFHE Admin Panel</span>
+    <a href="{{ url_for('admin_logout') }}">Logout</a>
+</div>
+
+<div class="sidebar">
+    <a href="{{ url_for('admin_dashboard') }}" class="{% if request.endpoint=='admin_dashboard' %}active{% endif %}">📊 <span>Dashboard</span></a>
+    <a href="{{ url_for('students') }}" class="{% if request.endpoint=='students' %}active{% endif %}">👨‍🎓 <span>Students</span></a>
+    <a href="{{ url_for('add_student') }}" class="{% if request.endpoint=='add_student' %}active{% endif %}">➕ <span>Add Student</span></a>
+    <a href="{{ url_for('branches') }}">🏫 <span>Branches</span></a>
+    <a href="{{ url_for('upload_data') }}">📤 <span>Upload Data</span></a>
+    <a href="{{ url_for('admin_notice') }}">📢 <span>Notice</span></a>
+    <a href="{{ url_for('documents') }}">📄 <span>Documents</span></a>
+    <a href="{{ url_for('announcements') }}">📣 <span>Announcements</span></a>
+    <a href="{{ url_for('admin_exams') }}">📝 <span>Exams</span></a>
+    <a href="{{ url_for('reports') }}">📈 <span>Reports</span></a>
+    <a href="{{ url_for('seating') }}">🪑 <span>Seating</span></a>
+    <a href="{{ url_for('admin_helpdesk') }}">🛠 <span>Help Desk</span></a>
+    <a href="{{ url_for('view_feedback') }}">💬 <span>Feedback</span></a>
+</div>
+
+<div class="content">
+    {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

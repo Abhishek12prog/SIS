@@ -1,0 +1,26 @@
+{% extends "base_student.html" %}
+
+{% block content %}
+
+<h2>Examinations</h2>
+
+<table border="1" width="100%">
+<tr>
+    <th>S#</th>
+    <th>Subject</th>
+    <th>Date</th>
+    <th>Time</th>
+</tr>
+
+{% for exam in exams %}
+<tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ exam[0] }}</td>
+    <td>{{ exam[1] }}</td>
+    <td>{{ exam[2] }}</td>
+</tr>
+{% endfor %}
+
+</table>
+
+{% endblock %}
