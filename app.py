@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import mysql.connector
 from datetime import datetime, timedelta
 import os
@@ -164,6 +164,7 @@ def ensure_exam_seating_tables():
             subject_name VARCHAR(150) NOT NULL,
             exam_date DATE NOT NULL,
             exam_time VARCHAR(50) NOT NULL,
+            exam_end_time VARCHAR(50) DEFAULT NULL,
             strategy VARCHAR(50) NOT NULL,
             room_reveal_hours_before INT DEFAULT 12,
             seat_reveal_minutes_before INT DEFAULT 10,
@@ -213,6 +214,22 @@ def ensure_exam_seating_tables():
     """)
 
     try:
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'exam_seating_plans'
+              AND COLUMN_NAME = 'exam_end_time'
+        """)
+        has_exam_end_time = cur.fetchone()[0] > 0
+
+        if not has_exam_end_time:
+            cur.execute("""
+                ALTER TABLE exam_seating_plans
+                ADD COLUMN exam_end_time VARCHAR(50) DEFAULT NULL
+                AFTER exam_time
+            """)
+
         cur.execute("""
             SELECT COUNT(*)
             FROM information_schema.COLUMNS
@@ -290,32 +307,87 @@ def build_group_label(course_type, year, branch):
     return " - ".join(parts)
 
 
+def resolve_course_types(course_type, branch):
+    course = (course_type or "").upper()
+    branch_value = (branch or "ALL").upper()
+
+    if course == "DEGREE":
+        if branch_value in ["BCA", "BSC"]:
+            return [branch_value]
+        return ["BCA", "BSC"]
+
+    return [course]
+
+
+def build_in_clause(values):
+    placeholders = ", ".join(["%s"] * len(values))
+    return f"({placeholders})"
+
+
+def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date=None, exam_time=None):
+    course_types = resolve_course_types(course_type, branch)
+    branch_value = (branch or "ALL").upper()
+
+    total_query = f"""
+        SELECT COUNT(*)
+        FROM students s
+        WHERE UPPER(s.course_type) IN {build_in_clause(course_types)}
+          AND s.year=%s
+    """
+    total_params = list(course_types) + [year]
+    if branch_value != "ALL" and branch_value not in ["BCA", "BSC"]:
+        total_query += " AND UPPER(s.branch)=%s"
+        total_params.append(branch_value)
+
+    cur.execute(total_query, tuple(total_params))
+    branch_year_total = cur.fetchone()[0]
+
+    matched_total = 0
+    if subject_name and exam_date and exam_time:
+        matched_query = f"""
+            SELECT COUNT(DISTINCT s.student_id)
+            FROM students s
+            JOIN exam_subjects e ON e.student_id = s.student_id
+            WHERE UPPER(s.course_type) IN {build_in_clause(course_types)}
+              AND s.year=%s
+              AND UPPER(e.subject_name)=%s
+              AND e.exam_date=%s
+              AND e.exam_time=%s
+        """
+        matched_params = list(course_types) + [year, subject_name.upper(), exam_date, exam_time]
+        if branch_value != "ALL" and branch_value not in ["BCA", "BSC"]:
+            matched_query += " AND UPPER(s.branch)=%s"
+            matched_params.append(branch_value)
+
+        cur.execute(matched_query, tuple(matched_params))
+        matched_total = cur.fetchone()[0]
+
+    return {
+        "branch_year_total": branch_year_total,
+        "matched_total": matched_total
+    }
+
+
 def get_students_for_group(cur, course_type, year, branch, subject_name, exam_date, exam_time):
-    if branch and branch != "ALL":
-        cur.execute("""
-            SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type,
-                   e.subject_name
-            FROM students s
-            JOIN exam_subjects e ON e.student_id = s.student_id
-            WHERE UPPER(s.course_type)=%s
-              AND s.year=%s
-              AND UPPER(s.branch)=%s
-              AND UPPER(e.subject_name)=%s
-              AND e.exam_date=%s
-              AND e.exam_time=%s
-        """, (course_type.upper(), year, branch.upper(), subject_name.upper(), exam_date, exam_time))
-    else:
-        cur.execute("""
-            SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type,
-                   e.subject_name
-            FROM students s
-            JOIN exam_subjects e ON e.student_id = s.student_id
-            WHERE UPPER(s.course_type)=%s
-              AND s.year=%s
-              AND UPPER(e.subject_name)=%s
-              AND e.exam_date=%s
-              AND e.exam_time=%s
-        """, (course_type.upper(), year, subject_name.upper(), exam_date, exam_time))
+    course_types = resolve_course_types(course_type, branch)
+    branch_value = (branch or "ALL").upper()
+    query = f"""
+        SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type,
+               e.subject_name
+        FROM students s
+        JOIN exam_subjects e ON e.student_id = s.student_id
+        WHERE UPPER(s.course_type) IN {build_in_clause(course_types)}
+          AND s.year=%s
+          AND UPPER(e.subject_name)=%s
+          AND e.exam_date=%s
+          AND e.exam_time=%s
+    """
+    params = list(course_types) + [year, subject_name.upper(), exam_date, exam_time]
+    if branch_value != "ALL" and branch_value not in ["BCA", "BSC"]:
+        query += " AND UPPER(s.branch)=%s"
+        params.append(branch_value)
+
+    cur.execute(query, tuple(params))
     return cur.fetchall()
 
 
@@ -1072,13 +1144,14 @@ def seating():
             exam_name = request.form.get('exam_name', '').strip()
             exam_date = request.form.get('exam_date')
             exam_time = request.form.get('exam_time', '').strip()
+            exam_end_time = request.form.get('exam_end_time', '').strip()
             strategy = request.form.get('strategy', 'alphabetical')
             room_reveal_hours_before = request.form.get('room_reveal_hours_before', type=int) or 12
             seat_reveal_minutes_before = request.form.get('seat_reveal_minutes_before', type=int) or 10
             selected_room_ids = request.form.getlist('room_ids')
 
-            if not exam_name or not exam_date or not exam_time:
-                error_message = "Please fill exam name, date, and time."
+            if not exam_name or not exam_date or not exam_time or not exam_end_time:
+                error_message = "Please fill exam name, date, start time, and end time."
             elif not selected_room_ids:
                 error_message = "Please select at least one classroom."
             else:
@@ -1103,6 +1176,15 @@ def seating():
                             break
 
                         group_label = build_group_label(course_type, year, branch)
+                        stats = get_group_stats(
+                            cur,
+                            course_type,
+                            year,
+                            branch,
+                            subject_name,
+                            exam_date,
+                            exam_time
+                        )
                         students = get_students_for_group(
                             cur,
                             course_type,
@@ -1128,6 +1210,7 @@ def seating():
                             'branch': branch.upper(),
                             'subject_name': subject_name,
                             'group_label': group_label,
+                            'branch_year_total': stats['branch_year_total'],
                             'student_count': len(enriched_students)
                         })
                         grouped_students[group_label] = enriched_students
@@ -1136,6 +1219,12 @@ def seating():
                         pass
                     elif not groups:
                         error_message = "Please select at least one student group."
+                    elif sum(group['student_count'] for group in groups) == 0:
+                        details = ", ".join(
+                            f"{group['group_label']} ({group['subject_name']}: 0 matched)"
+                            for group in groups
+                        )
+                        error_message = f"No students matched the selected exam details. Check subject/date/time or course mapping. {details}"
                     else:
                         placeholders = ','.join(['%s'] * len(selected_room_ids))
                         cur.execute(f"""
@@ -1159,15 +1248,16 @@ def seating():
                         else:
                             cur.execute("""
                                 INSERT INTO exam_seating_plans
-                                (exam_name, subject_name, exam_date, exam_time, strategy,
+                                (exam_name, subject_name, exam_date, exam_time, exam_end_time, strategy,
                                  room_reveal_hours_before, seat_reveal_minutes_before,
                                  selected_groups_json, room_ids_json, created_by)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """, (
                                 exam_name,
                                 'Mixed Session',
                                 exam_date,
                                 exam_time,
+                                exam_end_time,
                                 strategy,
                                 room_reveal_hours_before,
                                 seat_reveal_minutes_before,
@@ -1210,7 +1300,7 @@ def seating():
     classrooms = cur.fetchall()
 
     cur.execute("""
-        SELECT id, exam_name, subject_name, exam_date, exam_time, strategy, created_at
+        SELECT id, exam_name, subject_name, exam_date, exam_time, exam_end_time, strategy, created_at
         FROM exam_seating_plans
         ORDER BY exam_date DESC, created_at DESC
     """)
@@ -1224,7 +1314,7 @@ def seating():
 
     if plan_id:
         cur.execute("""
-            SELECT id, exam_name, subject_name, exam_date, exam_time, strategy,
+            SELECT id, exam_name, subject_name, exam_date, exam_time, exam_end_time, strategy,
                    room_reveal_hours_before, seat_reveal_minutes_before,
                    selected_groups_json, room_ids_json, created_at
             FROM exam_seating_plans
@@ -1271,6 +1361,53 @@ def seating():
         room_summary=room_summary,
         error_message=error_message
     )
+
+
+@app.route('/seating_group_counts')
+def seating_group_counts():
+    if 'admin' not in session:
+        return jsonify({"groups": [], "totals": {"branch_year_total": 0, "matched_total": 0}}), 403
+
+    exam_date = request.args.get('exam_date')
+    exam_time = request.args.get('exam_time')
+
+    db = get_db_connection()
+    cur = db.cursor()
+    groups = []
+    total_branch_year = 0
+    total_matched = 0
+
+    for index in range(1, 5):
+        course_type = request.args.get(f'course_type_{index}', '').strip()
+        year = request.args.get(f'year_{index}', type=int)
+        branch = request.args.get(f'branch_{index}', 'ALL').strip() or 'ALL'
+        subject_name = request.args.get(f'subject_name_{index}', '').strip()
+
+        if not course_type or not year:
+            continue
+
+        stats = get_group_stats(cur, course_type, year, branch, subject_name, exam_date, exam_time)
+        group = {
+            "index": index,
+            "group_label": build_group_label(course_type, year, branch),
+            "subject_name": subject_name,
+            "branch_year_total": stats["branch_year_total"],
+            "matched_total": stats["matched_total"]
+        }
+        groups.append(group)
+        total_branch_year += stats["branch_year_total"]
+        total_matched += stats["matched_total"]
+
+    cur.close()
+    db.close()
+
+    return jsonify({
+        "groups": groups,
+        "totals": {
+            "branch_year_total": total_branch_year,
+            "matched_total": total_matched
+        }
+    })
 
 
 @app.route('/classrooms/add', methods=['POST'])
@@ -1697,7 +1834,7 @@ def student_examinations():
 
     cur.execute("""
         SELECT e.subject_name, e.exam_date, e.exam_time,
-               p.exam_name, a.room_number, a.seat_label,
+               p.exam_name, p.exam_end_time, a.room_number, a.seat_label,
                a.room_visible_at, a.seat_visible_at
         FROM exam_subjects e
         LEFT JOIN exam_seating_allocations a
@@ -1708,7 +1845,7 @@ def student_examinations():
            AND p.exam_date = e.exam_date
            AND p.exam_time = e.exam_time
         WHERE e.student_id=%s
-        GROUP BY e.subject_name, e.exam_date, e.exam_time, p.exam_name,
+        GROUP BY e.subject_name, e.exam_date, e.exam_time, p.exam_name, p.exam_end_time,
                  a.room_number, a.seat_label, a.room_visible_at, a.seat_visible_at
         ORDER BY e.exam_date, e.exam_time
     """, (session['student_id'],))
