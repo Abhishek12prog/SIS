@@ -319,6 +319,28 @@ def resolve_course_types(course_type, branch):
     return [course]
 
 
+def resolve_subject_branches(course_type, branch, year):
+    course = (course_type or "").upper()
+    branch_value = (branch or "ALL").upper()
+
+    if course == "BTECH":
+        if year in [1]:
+            return ["ALL"]
+        if branch_value != "ALL":
+            return [branch_value]
+        return ["CSE", "CSEAI", "CSEDS", "ECE"]
+
+    if course == "DEGREE":
+        if branch_value in ["BCA", "BSC"]:
+            return [branch_value]
+        return ["BCA", "BSC"]
+
+    if course in ["BCA", "BSC"]:
+        return [course]
+
+    return [branch_value]
+
+
 def build_in_clause(values):
     placeholders = ", ".join(["%s"] * len(values))
     return f"({placeholders})"
@@ -389,6 +411,26 @@ def get_students_for_group(cur, course_type, year, branch, subject_name, exam_da
 
     cur.execute(query, tuple(params))
     return cur.fetchall()
+
+
+def get_available_subjects(cur, course_type, year, branch):
+    subject_branches = resolve_subject_branches(course_type, branch, year)
+    subject_sets = []
+
+    for subject_branch in subject_branches:
+        cur.execute("""
+            SELECT DISTINCT subject_name
+            FROM subjects
+            WHERE UPPER(branch)=%s AND year=%s
+            ORDER BY subject_name
+        """, (subject_branch.upper(), year))
+        subject_sets.append({row[0] for row in cur.fetchall()})
+
+    if not subject_sets:
+        return []
+
+    common = set.intersection(*subject_sets) if len(subject_sets) > 1 else subject_sets[0]
+    return sorted(common)
 
 
 def order_students(students, strategy):
@@ -1408,6 +1450,27 @@ def seating_group_counts():
             "matched_total": total_matched
         }
     })
+
+
+@app.route('/seating_subject_options')
+def seating_subject_options():
+    if 'admin' not in session:
+        return jsonify({"subjects": []}), 403
+
+    course_type = request.args.get('course_type', '').strip()
+    year = request.args.get('year', type=int)
+    branch = request.args.get('branch', 'ALL').strip() or 'ALL'
+
+    if not course_type or not year:
+        return jsonify({"subjects": []})
+
+    db = get_db_connection()
+    cur = db.cursor()
+    subjects = get_available_subjects(cur, course_type, year, branch)
+    cur.close()
+    db.close()
+
+    return jsonify({"subjects": subjects})
 
 
 @app.route('/classrooms/add', methods=['POST'])
