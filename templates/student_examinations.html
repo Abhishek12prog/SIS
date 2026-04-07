@@ -1,26 +1,88 @@
 {% extends "base_student.html" %}
-
 {% block content %}
+<style>
+    .card {
+        background: white;
+        border-radius: 18px;
+        box-shadow: 0 12px 30px rgba(47, 59, 76, 0.08);
+        padding: 22px;
+        margin-bottom: 22px;
+    }
 
-<h2>Examinations</h2>
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
 
-<table border="1" width="100%">
-<tr>
-    <th>S#</th>
-    <th>Subject</th>
-    <th>Date</th>
-    <th>Time</th>
-</tr>
+    th, td {
+        text-align: left;
+        padding: 12px;
+        border-bottom: 1px solid #edf2f7;
+        vertical-align: top;
+    }
 
-{% for exam in exams %}
-<tr>
-    <td>{{ loop.index }}</td>
-    <td>{{ exam[0] }}</td>
-    <td>{{ exam[1] }}</td>
-    <td>{{ exam[2] }}</td>
-</tr>
-{% endfor %}
+    .pill {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #e8eef6;
+        color: #22313f;
+        font-size: 12px;
+        font-weight: 700;
+    }
 
-</table>
+    .hidden-note {
+        color: #92400e;
+        background: #fff7ed;
+        padding: 7px 10px;
+        border-radius: 10px;
+        display: inline-block;
+    }
+</style>
 
+<div class="card">
+    <h2 style="margin-top: 0;">Examinations</h2>
+    <p style="color: #64748b;">Room numbers can be released earlier and exact seat numbers can be revealed just before the exam, depending on the seating plan created by admin.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>S#</th>
+                <th>Subject</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Room</th>
+                <th>Seat</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exam in exams %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ exam.subject_name }}</td>
+                <td>{{ exam.exam_date }}</td>
+                <td>{{ exam.exam_time }}</td>
+                <td>
+                    {% if exam.room_number and exam.room_is_visible %}
+                        <span class="pill">{{ exam.room_number }}</span>
+                    {% elif exam.room_number %}
+                        <span class="hidden-note">Room will be shown later</span>
+                    {% else %}
+                        <span style="color: #64748b;">Not assigned yet</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if exam.seat_label and exam.seat_is_visible %}
+                        <span class="pill">{{ exam.seat_label }}</span>
+                    {% elif exam.seat_label %}
+                        <span class="hidden-note">Seat will be revealed shortly before the exam</span>
+                    {% else %}
+                        <span style="color: #64748b;">Not assigned yet</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}
