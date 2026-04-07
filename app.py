@@ -169,37 +169,40 @@ def students():
 @app.route('/add_student', methods=['GET', 'POST'])
 def add_student():
 
-    # ✅ Session check FIRST
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
 
     if request.method == 'POST':
-        db = get_db_connection()
-        cur = db.cursor()
+        try:
+            db = get_db_connection()
+            cur = db.cursor()
 
-        cur.execute("""
-            INSERT INTO students 
-            (name, email, branch, username, password, joining_year, course_type)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            request.form['name'],
-            request.form['email'],
-            request.form['branch'],
-            request.form['username'],
-            request.form['password'],
-            int(request.form['joining_year']),
-            request.form['course_type']
-        ))
+            cur.execute("""
+                INSERT INTO students 
+                (name, email, branch, year, semester, course_type, phone, username, password)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                request.form['name'],
+                request.form['email'],
+                request.form['branch'],
+                int(request.form['year']),          # ✅ changed
+                int(request.form['semester']),      # ✅ added
+                request.form['course_type'],
+                request.form['phone'],              # ✅ added
+                request.form['username'],
+                request.form['password']
+            ))
 
-        db.commit()
-        cur.close()
-        db.close()
+            db.commit()
+            cur.close()
+            db.close()
 
-        return redirect(url_for('students'))  # ✅ after insert
+            return redirect(url_for('students'))
 
-    # ✅ GET request → show form
+        except Exception as e:
+            return f"Error: {e}"
+
     return render_template('add_student.html')
-
 @app.route('/branches')
 def branches():
     if 'admin' not in session:
