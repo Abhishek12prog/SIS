@@ -996,6 +996,7 @@ CREATE TABLE `exam_seating_allocations` (
   `plan_id` int NOT NULL,
   `student_id` int NOT NULL,
   `classroom_id` int NOT NULL,
+  `subject_name` varchar(150) NOT NULL,
   `room_number` varchar(50) NOT NULL,
   `seat_number` int NOT NULL,
   `seat_label` varchar(20) NOT NULL,
