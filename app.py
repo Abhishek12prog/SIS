@@ -1186,6 +1186,18 @@ def seating():
         return redirect(url_for('admin_login'))
 
     db = get_db_connection()
+    if db is None:
+        return render_template(
+            'admin_seating.html',
+            classrooms=[],
+            plans=[],
+            selected_plan=None,
+            selected_plan_groups=[],
+            plan_allocations=[],
+            room_summary=[],
+            error_message="Database connection failed. Please try again in a moment."
+        )
+
     cur = db.cursor(dictionary=True)
     generated_plan_id = None
     error_message = None
@@ -1442,6 +1454,9 @@ def seating_group_counts():
     exam_time = request.args.get('exam_time')
 
     db = get_db_connection()
+    if db is None:
+        return jsonify({"groups": [], "totals": {"branch_year_total": 0, "matched_total": 0}})
+
     cur = db.cursor()
     groups = []
     total_branch_year = 0
@@ -1493,6 +1508,9 @@ def seating_subject_options():
         return jsonify({"subjects": []})
 
     db = get_db_connection()
+    if db is None:
+        return jsonify({"subjects": []})
+
     cur = db.cursor()
     subjects = get_available_subjects(cur, course_type, year, branch)
     cur.close()
