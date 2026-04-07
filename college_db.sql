@@ -422,6 +422,110 @@ LOCK TABLES `faculty_schedule` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `classrooms`
+--
+
+DROP TABLE IF EXISTS `classrooms`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `classrooms` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `room_number` varchar(50) NOT NULL,
+  `block_name` varchar(100) DEFAULT NULL,
+  `total_seats` int NOT NULL,
+  `columns_count` int DEFAULT '6',
+  `is_active` tinyint(1) DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `classrooms`
+--
+
+LOCK TABLES `classrooms` WRITE;
+/*!40000 ALTER TABLE `classrooms` DISABLE KEYS */;
+/*!40000 ALTER TABLE `classrooms` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `exam_seating_plans`
+--
+
+DROP TABLE IF EXISTS `exam_seating_plans`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `exam_seating_plans` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `exam_name` varchar(150) NOT NULL,
+  `subject_name` varchar(150) NOT NULL,
+  `exam_date` date NOT NULL,
+  `exam_time` varchar(50) NOT NULL,
+  `strategy` varchar(50) NOT NULL,
+  `room_reveal_hours_before` int DEFAULT '12',
+  `seat_reveal_minutes_before` int DEFAULT '10',
+  `selected_groups_json` longtext,
+  `room_ids_json` longtext,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `exam_seating_plans_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `admin` (`admin_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `exam_seating_plans`
+--
+
+LOCK TABLES `exam_seating_plans` WRITE;
+/*!40000 ALTER TABLE `exam_seating_plans` DISABLE KEYS */;
+/*!40000 ALTER TABLE `exam_seating_plans` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `exam_seating_allocations`
+--
+
+DROP TABLE IF EXISTS `exam_seating_allocations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `exam_seating_allocations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `plan_id` int NOT NULL,
+  `student_id` int NOT NULL,
+  `classroom_id` int NOT NULL,
+  `room_number` varchar(50) NOT NULL,
+  `seat_number` int NOT NULL,
+  `seat_label` varchar(20) NOT NULL,
+  `row_number` int NOT NULL,
+  `col_number` int NOT NULL,
+  `group_label` varchar(100) NOT NULL,
+  `ordering_value` varchar(120) DEFAULT NULL,
+  `room_visible_at` datetime NOT NULL,
+  `seat_visible_at` datetime NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `plan_id` (`plan_id`),
+  KEY `student_id` (`student_id`),
+  KEY `classroom_id` (`classroom_id`),
+  CONSTRAINT `exam_seating_allocations_ibfk_1` FOREIGN KEY (`plan_id`) REFERENCES `exam_seating_plans` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `exam_seating_allocations_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE,
+  CONSTRAINT `exam_seating_allocations_ibfk_3` FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `exam_seating_allocations`
+--
+
+LOCK TABLES `exam_seating_allocations` WRITE;
+/*!40000 ALTER TABLE `exam_seating_allocations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `exam_seating_allocations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `subjects`
 --
 
