@@ -962,6 +962,7 @@ CREATE TABLE `exam_seating_plans` (
   `subject_name` varchar(150) NOT NULL,
   `exam_date` date NOT NULL,
   `exam_time` varchar(50) NOT NULL,
+  `exam_end_time` varchar(50) DEFAULT NULL,
   `strategy` varchar(50) NOT NULL,
   `room_reveal_hours_before` int DEFAULT '12',
   `seat_reveal_minutes_before` int DEFAULT '10',
