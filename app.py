@@ -302,7 +302,7 @@ def build_seat_positions(total_seats, columns_count):
     for seat_number in range(1, total_seats + 1):
         seat_row = ((seat_number - 1) // columns) + 1
         seat_column = ((seat_number - 1) % columns) + 1
-        seat_label = f"R{seat_row}S{seat_column}"
+        seat_label = str(seat_number)
         positions.append({
             'seat_number': seat_number,
             'seat_row': seat_row,
