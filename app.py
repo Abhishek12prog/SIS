@@ -214,10 +214,20 @@ def ensure_exam_seating_tables():
 
     try:
         cur.execute("""
-            ALTER TABLE exam_seating_allocations
-            ADD COLUMN IF NOT EXISTS subject_name VARCHAR(150) NOT NULL
-            AFTER classroom_id
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'exam_seating_allocations'
+              AND COLUMN_NAME = 'subject_name'
         """)
+        has_subject_name = cur.fetchone()[0] > 0
+
+        if not has_subject_name:
+            cur.execute("""
+                ALTER TABLE exam_seating_allocations
+                ADD COLUMN subject_name VARCHAR(150) NOT NULL
+                AFTER classroom_id
+            """)
     except Exception as e:
         print("ALTER exam_seating_allocations skipped:", e)
 
