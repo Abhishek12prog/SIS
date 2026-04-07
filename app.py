@@ -346,6 +346,17 @@ def build_in_clause(values):
     return f"({placeholders})"
 
 
+def column_exists(cur, table_name, column_name):
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+    """, (table_name, column_name))
+    return cur.fetchone()[0] > 0
+
+
 def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date=None, exam_time=None):
     course_types = resolve_course_types(course_type, branch)
     branch_value = (branch or "ALL").upper()
@@ -1178,6 +1189,14 @@ def seating():
     cur = db.cursor(dictionary=True)
     generated_plan_id = None
     error_message = None
+    has_exam_end_time = False
+
+    try:
+        meta_cur = db.cursor()
+        has_exam_end_time = column_exists(meta_cur, 'exam_seating_plans', 'exam_end_time')
+        meta_cur.close()
+    except Exception:
+        has_exam_end_time = False
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -1341,11 +1360,16 @@ def seating():
     """)
     classrooms = cur.fetchall()
 
-    cur.execute("""
-        SELECT id, exam_name, subject_name, exam_date, exam_time, exam_end_time, strategy, created_at
+    plans_query = """
+        SELECT id, exam_name, subject_name, exam_date, exam_time,
+               {exam_end_time_select}
+               strategy, created_at
         FROM exam_seating_plans
         ORDER BY exam_date DESC, created_at DESC
-    """)
+    """.format(
+        exam_end_time_select="exam_end_time, " if has_exam_end_time else "NULL AS exam_end_time, "
+    )
+    cur.execute(plans_query)
     plans = cur.fetchall()
 
     plan_id = request.args.get('plan_id', type=int) or generated_plan_id
@@ -1355,13 +1379,17 @@ def seating():
     room_summary = []
 
     if plan_id:
-        cur.execute("""
-            SELECT id, exam_name, subject_name, exam_date, exam_time, exam_end_time, strategy,
-                   room_reveal_hours_before, seat_reveal_minutes_before,
+        selected_plan_query = """
+            SELECT id, exam_name, subject_name, exam_date, exam_time,
+                   {exam_end_time_select}
+                   strategy, room_reveal_hours_before, seat_reveal_minutes_before,
                    selected_groups_json, room_ids_json, created_at
             FROM exam_seating_plans
             WHERE id=%s
-        """, (plan_id,))
+        """.format(
+            exam_end_time_select="exam_end_time, " if has_exam_end_time else "NULL AS exam_end_time, "
+        )
+        cur.execute(selected_plan_query, (plan_id,))
         selected_plan = cur.fetchone()
 
         if selected_plan:
@@ -1894,11 +1922,14 @@ def student_examinations():
 
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
+    meta_cur = db.cursor()
+    has_exam_end_time = column_exists(meta_cur, 'exam_seating_plans', 'exam_end_time')
+    meta_cur.close()
 
-    cur.execute("""
+    exam_query = """
         SELECT e.subject_name, e.exam_date, e.exam_time,
-               p.exam_name, p.exam_end_time, a.room_number, a.seat_label,
-               a.room_visible_at, a.seat_visible_at
+               p.exam_name, {exam_end_time_select}
+               a.room_number, a.seat_label, a.room_visible_at, a.seat_visible_at
         FROM exam_subjects e
         LEFT JOIN exam_seating_allocations a
             ON a.student_id = e.student_id
@@ -1908,10 +1939,14 @@ def student_examinations():
            AND p.exam_date = e.exam_date
            AND p.exam_time = e.exam_time
         WHERE e.student_id=%s
-        GROUP BY e.subject_name, e.exam_date, e.exam_time, p.exam_name, p.exam_end_time,
+        GROUP BY e.subject_name, e.exam_date, e.exam_time, p.exam_name, {exam_end_time_group}
                  a.room_number, a.seat_label, a.room_visible_at, a.seat_visible_at
         ORDER BY e.exam_date, e.exam_time
-    """, (session['student_id'],))
+    """.format(
+        exam_end_time_select="p.exam_end_time, " if has_exam_end_time else "NULL AS exam_end_time, ",
+        exam_end_time_group="p.exam_end_time, " if has_exam_end_time else ""
+    )
+    cur.execute(exam_query, (session['student_id'],))
 
     exams = cur.fetchall()
     now = datetime.now()
