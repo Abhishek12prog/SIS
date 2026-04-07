@@ -168,10 +168,8 @@ def students():
 
 @app.route('/add_student', methods=['GET', 'POST'])
 def add_student():
-    if request.method == 'POST':
-        # insert into DB
-        return "Student Added Successfully"
-    return "This is Add Student Page"
+
+    # ✅ Session check FIRST
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
 
@@ -189,7 +187,7 @@ def add_student():
             request.form['branch'],
             request.form['username'],
             request.form['password'],
-            int(request.form['joining_year']),   # ✅ FIX
+            int(request.form['joining_year']),
             request.form['course_type']
         ))
 
@@ -197,10 +195,10 @@ def add_student():
         cur.close()
         db.close()
 
-        return redirect(url_for('students'))
+        return redirect(url_for('students'))  # ✅ after insert
 
+    # ✅ GET request → show form
     return render_template('add_student.html')
-
 
 @app.route('/branches')
 def branches():
