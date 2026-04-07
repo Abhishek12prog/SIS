@@ -226,10 +226,6 @@
                         <input type="text" name="exam_name" placeholder="Mid Sem 1" required>
                     </div>
                     <div>
-                        <label>Subject</label>
-                        <input type="text" name="subject_name" placeholder="Data Structures" required>
-                    </div>
-                    <div>
                         <label>Exam Date</label>
                         <input type="date" name="exam_date" required>
                     </div>
@@ -283,6 +279,10 @@
                         <label>Branch {{ idx }}</label>
                         <input type="text" name="branch_{{ idx }}" placeholder="ALL / CSE / ECE">
                     </div>
+                    <div>
+                        <label>Subject {{ idx }}</label>
+                        <input type="text" name="subject_name_{{ idx }}" placeholder="Example: DBMS / Signals & Systems">
+                    </div>
                 </div>
                 {% endfor %}
 
@@ -307,8 +307,30 @@
         <div class="card">
             <h3>Selected Plan Details</h3>
             {% if selected_plan %}
-                <p><strong>{{ selected_plan.exam_name }}</strong> | {{ selected_plan.subject_name }} | {{ selected_plan.exam_date }} | {{ selected_plan.exam_time }}</p>
+                <p><strong>{{ selected_plan.exam_name }}</strong> | {{ selected_plan.exam_date }} | {{ selected_plan.exam_time }}</p>
                 <p style="color: #64748b;">Room number is visible {{ selected_plan.room_reveal_hours_before }} hours before the exam. Exact seat number is visible {{ selected_plan.seat_reveal_minutes_before }} minutes before the exam.</p>
+
+                {% if selected_plan_groups %}
+                    <h4>Selected Group Subjects</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Group</th>
+                                <th>Subject</th>
+                                <th>Students</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for group in selected_plan_groups %}
+                                <tr>
+                                    <td>{{ group.group_label }}</td>
+                                    <td>{{ group.subject_name }}</td>
+                                    <td>{{ group.student_count }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
 
                 {% if room_summary %}
                     <h4>Room Summary</h4>
@@ -338,6 +360,7 @@
                             <th>Seat</th>
                             <th>Student</th>
                             <th>Enrollment</th>
+                            <th>Subject</th>
                             <th>Branch</th>
                             <th>Course</th>
                             <th>Year</th>
@@ -351,6 +374,7 @@
                                 <td>{{ item.seat_label }}</td>
                                 <td>{{ item.name }}</td>
                                 <td>{{ item.username }}</td>
+                                <td>{{ item.subject_name }}</td>
                                 <td>{{ item.branch }}</td>
                                 <td>{{ item.course_type }}</td>
                                 <td>{{ item.year }}</td>
