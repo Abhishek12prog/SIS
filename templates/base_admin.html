@@ -84,7 +84,7 @@
 
 <div class="topbar">
     <img src="{{ url_for('static', filename='images/ifhe-Logo.svg') }}">
-    <span>IFHE Admin Panel</span>
+    <span>IFHE Admin / Faculty Panel</span>
     <a href="{{ url_for('admin_logout') }}">Logout</a>
 </div>
 
@@ -100,6 +100,7 @@
     <a href="{{ url_for('admin_exams') }}">📝 <span>Exams</span></a>
     <a href="{{ url_for('reports') }}">📈 <span>Reports</span></a>
     <a href="{{ url_for('seating') }}">🪑 <span>Seating</span></a>
+    <a href="{{ url_for('faculty_portal') }}" class="{% if request.endpoint=='faculty_portal' %}active{% endif %}">🧑‍🏫 <span>Faculty Portal</span></a>
     <a href="{{ url_for('admin_helpdesk') }}">🛠 <span>Help Desk</span></a>
     <a href="{{ url_for('view_feedback') }}">💬 <span>Feedback</span></a>
 </div>
