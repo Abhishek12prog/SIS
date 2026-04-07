@@ -325,6 +325,103 @@ INSERT INTO `students` VALUES (1,'Rahul','rahul@gmail.com','CSE','rahul','rahul1
 UNLOCK TABLES;
 
 --
+-- Table structure for table `faculty_chat_messages`
+--
+
+DROP TABLE IF EXISTS `faculty_chat_messages`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `faculty_chat_messages` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `faculty_id` int NOT NULL,
+  `sender_role` varchar(20) NOT NULL,
+  `message` text NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `student_id` (`student_id`),
+  KEY `faculty_id` (`faculty_id`),
+  CONSTRAINT `faculty_chat_messages_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE,
+  CONSTRAINT `faculty_chat_messages_ibfk_2` FOREIGN KEY (`faculty_id`) REFERENCES `admin` (`admin_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `faculty_chat_messages`
+--
+
+LOCK TABLES `faculty_chat_messages` WRITE;
+/*!40000 ALTER TABLE `faculty_chat_messages` DISABLE KEYS */;
+/*!40000 ALTER TABLE `faculty_chat_messages` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `faculty_meeting_requests`
+--
+
+DROP TABLE IF EXISTS `faculty_meeting_requests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `faculty_meeting_requests` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `faculty_id` int NOT NULL,
+  `request_message` text NOT NULL,
+  `preferred_slot` varchar(120) DEFAULT NULL,
+  `status` varchar(20) DEFAULT 'Pending',
+  `faculty_response` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `student_id` (`student_id`),
+  KEY `faculty_id` (`faculty_id`),
+  CONSTRAINT `faculty_meeting_requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE,
+  CONSTRAINT `faculty_meeting_requests_ibfk_2` FOREIGN KEY (`faculty_id`) REFERENCES `admin` (`admin_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `faculty_meeting_requests`
+--
+
+LOCK TABLES `faculty_meeting_requests` WRITE;
+/*!40000 ALTER TABLE `faculty_meeting_requests` DISABLE KEYS */;
+/*!40000 ALTER TABLE `faculty_meeting_requests` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `faculty_schedule`
+--
+
+DROP TABLE IF EXISTS `faculty_schedule`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `faculty_schedule` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `faculty_id` int NOT NULL,
+  `title` varchar(120) NOT NULL,
+  `day_name` varchar(20) NOT NULL,
+  `start_time` varchar(20) NOT NULL,
+  `end_time` varchar(20) NOT NULL,
+  `location` varchar(120) DEFAULT NULL,
+  `availability_note` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `faculty_id` (`faculty_id`),
+  CONSTRAINT `faculty_schedule_ibfk_1` FOREIGN KEY (`faculty_id`) REFERENCES `admin` (`admin_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `faculty_schedule`
+--
+
+LOCK TABLES `faculty_schedule` WRITE;
+/*!40000 ALTER TABLE `faculty_schedule` DISABLE KEYS */;
+/*!40000 ALTER TABLE `faculty_schedule` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `subjects`
 --
 
