@@ -168,6 +168,10 @@ def students():
 
 @app.route('/add_student', methods=['GET', 'POST'])
 def add_student():
+    if request.method == 'POST':
+        # insert into DB
+        return "Student Added Successfully"
+    return "This is Add Student Page"
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
 
