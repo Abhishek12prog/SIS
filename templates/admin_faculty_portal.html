@@ -1,0 +1,317 @@
+{% extends "base_admin.html" %}
+{% block content %}
+<style>
+    .hero, .card {
+        background: white;
+        border-radius: 18px;
+        box-shadow: 0 12px 30px rgba(34, 49, 63, 0.08);
+        padding: 22px;
+        margin-bottom: 22px;
+    }
+
+    .layout {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 22px;
+    }
+
+    .stack {
+        display: grid;
+        gap: 22px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+    }
+
+    input, textarea, button, select {
+        width: 100%;
+        padding: 11px 12px;
+        border-radius: 10px;
+        border: 1px solid #d6dde7;
+        box-sizing: border-box;
+        font: inherit;
+    }
+
+    textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    button, .button-link {
+        border: none;
+        background: #22313f;
+        color: white;
+        cursor: pointer;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .button-link {
+        padding: 10px 14px;
+        border-radius: 10px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        text-align: left;
+        padding: 12px;
+        border-bottom: 1px solid #edf2f7;
+        vertical-align: top;
+    }
+
+    .status {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .status.Pending {
+        background: #fff4d6;
+        color: #8a6510;
+    }
+
+    .status.Approved {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status.Rejected {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .chat-student {
+        display: block;
+        padding: 12px 14px;
+        background: #f5f7fb;
+        color: #22313f;
+        border-radius: 12px;
+        text-decoration: none;
+        margin-bottom: 10px;
+    }
+
+    .chat-student.active {
+        background: #22313f;
+        color: white;
+    }
+
+    .chat-box {
+        background: #f7f9fc;
+        border-radius: 14px;
+        padding: 16px;
+        max-height: 360px;
+        overflow-y: auto;
+    }
+
+    .message {
+        margin-bottom: 14px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        max-width: 85%;
+    }
+
+    .message.student {
+        background: #e9eef5;
+    }
+
+    .message.faculty {
+        background: #d8e8ff;
+        margin-left: auto;
+    }
+
+    .muted {
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+        .layout {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="hero">
+    <h2 style="margin: 0 0 8px 0;">Faculty Portal</h2>
+    <p class="muted" style="margin: 0;">Manage your visible timetable, approve student cabin requests, and respond to student doubts directly in SIS.</p>
+</div>
+
+<div class="layout">
+    <div class="stack">
+        <div class="card">
+            <h3>Add Schedule Slot</h3>
+            <form method="POST" action="{{ url_for('add_faculty_schedule') }}">
+                <div class="form-grid">
+                    <div>
+                        <label>Title</label>
+                        <input type="text" name="title" placeholder="Class / Office Hour / Lab" required>
+                    </div>
+                    <div>
+                        <label>Day</label>
+                        <select name="day_name" required>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Start Time</label>
+                        <input type="text" name="start_time" placeholder="10:00 AM" required>
+                    </div>
+                    <div>
+                        <label>End Time</label>
+                        <input type="text" name="end_time" placeholder="11:00 AM" required>
+                    </div>
+                    <div>
+                        <label>Location</label>
+                        <input type="text" name="location" placeholder="CSE Cabin 204">
+                    </div>
+                    <div>
+                        <label>Availability Note</label>
+                        <input type="text" name="availability_note" placeholder="Students can meet after this session">
+                    </div>
+                </div>
+                <div style="margin-top: 14px;">
+                    <button type="submit">Save Schedule</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Your Schedule</h3>
+            {% if schedules %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>Session</th>
+                            <th>Time</th>
+                            <th>Location</th>
+                            <th>Note</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for schedule in schedules %}
+                            <tr>
+                                <td>{{ schedule.day_name }}</td>
+                                <td>{{ schedule.title }}</td>
+                                <td>{{ schedule.start_time }} - {{ schedule.end_time }}</td>
+                                <td>{{ schedule.location or '-' }}</td>
+                                <td>{{ schedule.availability_note or '-' }}</td>
+                                <td>
+                                    <a class="button-link" href="{{ url_for('delete_faculty_schedule', schedule_id=schedule.id) }}">Delete</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">Add your weekly schedule so students can check when you are available.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Student Meeting Requests</h3>
+            {% if meeting_requests %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Branch</th>
+                            <th>Message</th>
+                            <th>Preferred Slot</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in meeting_requests %}
+                            <tr>
+                                <td>{{ item.student_name }}</td>
+                                <td>{{ item.branch }}</td>
+                                <td>{{ item.request_message }}</td>
+                                <td>{{ item.preferred_slot or '-' }}</td>
+                                <td>
+                                    <span class="status {{ item.status }}">{{ item.status }}</span><br>
+                                    <span class="muted">{{ item.faculty_response or 'No response yet' }}</span>
+                                </td>
+                                <td>
+                                    {% if item.status == 'Pending' %}
+                                        <a class="button-link" href="{{ url_for('update_faculty_request', request_id=item.id, action='approve') }}">Approve</a>
+                                        <a class="button-link" style="margin-top: 8px; background: #7f1d1d;" href="{{ url_for('update_faculty_request', request_id=item.id, action='reject') }}">Reject</a>
+                                    {% else %}
+                                        <span class="muted">Updated</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">Student requests will appear here.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stack">
+        <div class="card">
+            <h3>Student Chats</h3>
+            {% if chat_students %}
+                {% for student in chat_students %}
+                    <a class="chat-student {% if selected_student and student.student_id == selected_student.student_id %}active{% endif %}" href="{{ url_for('faculty_portal', student_id=student.student_id) }}">
+                        <strong>{{ student.name }}</strong><br>
+                        <span class="muted">{{ student.branch }}{% if student.last_message_at %} • {{ student.last_message_at.strftime('%d %b %Y %I:%M %p') }}{% endif %}</span>
+                    </a>
+                {% endfor %}
+            {% else %}
+                <p class="muted">Student chat threads will show up here after the first message.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Conversation</h3>
+            {% if selected_student %}
+                <p class="muted">Replying to <strong>{{ selected_student.name }}</strong> ({{ selected_student.branch }})</p>
+                <div class="chat-box">
+                    {% if chat_messages %}
+                        {% for message in chat_messages %}
+                            <div class="message {{ message.sender_role }}">
+                                <strong>{{ selected_student.name if message.sender_role == 'student' else 'You' }}</strong><br>
+                                <div>{{ message.message }}</div>
+                                <div class="muted" style="margin-top: 6px;">{{ message.created_at.strftime('%d %b %Y %I:%M %p') if message.created_at else '' }}</div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="muted">No messages in this thread yet.</p>
+                    {% endif %}
+                </div>
+
+                <form method="POST" action="{{ url_for('faculty_chat_reply') }}" style="margin-top: 14px;">
+                    <input type="hidden" name="student_id" value="{{ selected_student.student_id }}">
+                    <textarea name="message" placeholder="Type your reply here..." required></textarea>
+                    <div style="margin-top: 12px;">
+                        <button type="submit">Send Reply</button>
+                    </div>
+                </form>
+            {% else %}
+                <p class="muted">Select a student conversation to reply.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
