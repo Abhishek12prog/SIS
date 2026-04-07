@@ -1,55 +1,368 @@
-<form method="POST">
+{% extends "base_admin.html" %}
+{% block content %}
+<style>
+    .hero, .card {
+        background: white;
+        border-radius: 18px;
+        box-shadow: 0 12px 30px rgba(34, 49, 63, 0.08);
+        padding: 22px;
+        margin-bottom: 22px;
+    }
 
-<h3>Session Setup</h3>
+    .layout {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 22px;
+    }
 
-Session:
-<select name="session">
-    <option value="1">Session 1</option>
-    <option value="2">Session 2</option>
-    <option value="3">Session 3</option>
-    <option value="4">Session 4</option>
-</select><br><br>
+    .stack {
+        display: grid;
+        gap: 22px;
+    }
 
-<h4>Group 1</h4>
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+    }
 
-Type:
-<select name="type1">
-    <option value="BTECH">B.Tech</option>
-    <option value="DEGREE">Degree</option>
-</select><br><br>
+    input, textarea, button, select {
+        width: 100%;
+        padding: 11px 12px;
+        border-radius: 10px;
+        border: 1px solid #d6dde7;
+        box-sizing: border-box;
+        font: inherit;
+    }
 
-Year:
-<select name="year1">
-    <option value="1">1st Year</option>
-    <option value="2">2nd Year</option>
-    <option value="3">3rd Year</option>
-    <option value="4">4th Year</option>
-</select><br><br>
+    button, .button-link {
+        border: none;
+        background: #22313f;
+        color: white;
+        cursor: pointer;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-block;
+        text-align: center;
+    }
 
-<h4>Group 2</h4>
+    .button-link {
+        padding: 10px 14px;
+        border-radius: 10px;
+    }
 
-Type:
-<select name="type2">
-    <option value="BTECH">B.Tech</option>
-    <option value="DEGREE">Degree</option>
-</select><br><br>
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
 
-Year:
-<select name="year2">
-    <option value="1">1st Year</option>
-    <option value="2">2nd Year</option>
-    <option value="3">3rd Year</option>
-    <option value="4">4th Year</option>
-</select><br><br>
+    th, td {
+        text-align: left;
+        padding: 12px;
+        border-bottom: 1px solid #edf2f7;
+        vertical-align: top;
+    }
 
-<h4>Room Setup</h4>
+    .room-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+    }
 
-Rooms:
-<input type="number" name="rooms" required><br><br>
+    .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px 14px;
+    }
 
-Seats per Room:
-<input type="number" name="capacity" required><br><br>
+    .checkbox-row input[type="checkbox"] {
+        width: auto;
+    }
 
-<button type="submit">Generate Seating</button>
+    .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+    }
 
-</form>
+    .pill {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #e8eef6;
+        color: #22313f;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .alert {
+        background: #fff4d6;
+        color: #8a6510;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+    }
+
+    @media (max-width: 1100px) {
+        .layout {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="hero">
+    <h2 style="margin: 0 0 8px 0;">Smart Seating Arrangement</h2>
+    <p style="margin: 0; color: #64748b;">Add classrooms, choose which student groups are writing together, generate alternate seating, and reveal room and seat details at different times.</p>
+</div>
+
+{% if error_message %}
+<div class="alert">{{ error_message }}</div>
+{% endif %}
+
+<div class="layout">
+    <div class="stack">
+        <div class="card">
+            <h3>Add Classroom</h3>
+            <form method="POST" action="{{ url_for('add_classroom') }}">
+                <div class="form-grid">
+                    <div>
+                        <label>Room Number</label>
+                        <input type="text" name="room_number" placeholder="A-201" required>
+                    </div>
+                    <div>
+                        <label>Block</label>
+                        <input type="text" name="block_name" placeholder="Main Block">
+                    </div>
+                    <div>
+                        <label>Total Seats</label>
+                        <input type="number" name="total_seats" min="1" required>
+                    </div>
+                    <div>
+                        <label>Columns</label>
+                        <input type="number" name="columns_count" min="1" value="6">
+                    </div>
+                </div>
+                <div style="margin-top: 14px;">
+                    <button type="submit">Save Classroom</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Classrooms</h3>
+            {% if classrooms %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Room</th>
+                            <th>Block</th>
+                            <th>Seats</th>
+                            <th>Columns</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for room in classrooms %}
+                            <tr>
+                                <td>{{ room.room_number }}</td>
+                                <td>{{ room.block_name or '-' }}</td>
+                                <td>{{ room.total_seats }}</td>
+                                <td>{{ room.columns_count }}</td>
+                                <td><a class="button-link" href="{{ url_for('delete_classroom', classroom_id=room.id) }}">Delete</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #64748b;">No classrooms added yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Generated Plans</h3>
+            {% if plans %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Exam</th>
+                            <th>Subject</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Strategy</th>
+                            <th>Open</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in plans %}
+                            <tr>
+                                <td>{{ plan.exam_name }}</td>
+                                <td>{{ plan.subject_name }}</td>
+                                <td>{{ plan.exam_date }}</td>
+                                <td>{{ plan.exam_time }}</td>
+                                <td><span class="pill">{{ plan.strategy }}</span></td>
+                                <td><a class="button-link" href="{{ url_for('seating_plan', plan_id=plan.id) }}">View</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #64748b;">Generated seating plans will appear here.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stack">
+        <div class="card">
+            <h3>Generate Seating Plan</h3>
+            <form method="POST" action="{{ url_for('seating') }}">
+                <input type="hidden" name="action" value="generate_plan">
+
+                <div class="form-grid">
+                    <div>
+                        <label>Exam Name</label>
+                        <input type="text" name="exam_name" placeholder="Mid Sem 1" required>
+                    </div>
+                    <div>
+                        <label>Subject</label>
+                        <input type="text" name="subject_name" placeholder="Data Structures" required>
+                    </div>
+                    <div>
+                        <label>Exam Date</label>
+                        <input type="date" name="exam_date" required>
+                    </div>
+                    <div>
+                        <label>Exam Time</label>
+                        <input type="text" name="exam_time" placeholder="10:00 AM" required>
+                    </div>
+                    <div>
+                        <label>Strategy</label>
+                        <select name="strategy">
+                            <option value="alphabetical">Alphabetical</option>
+                            <option value="enrollment">Enrollment Number</option>
+                            <option value="branch_shuffle">Branch Rotation</option>
+                            <option value="student_id">Student ID</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Room Reveal (hours before)</label>
+                        <input type="number" name="room_reveal_hours_before" value="12" min="1" required>
+                    </div>
+                    <div>
+                        <label>Seat Reveal (minutes before)</label>
+                        <input type="number" name="seat_reveal_minutes_before" value="10" min="1" required>
+                    </div>
+                </div>
+
+                <h4 style="margin-top: 18px;">Student Groups</h4>
+                {% for idx in [1, 2, 3, 4] %}
+                <div class="mini-grid" style="margin-bottom: 10px;">
+                    <div>
+                        <label>Course {{ idx }}</label>
+                        <select name="course_type_{{ idx }}">
+                            <option value="">Skip</option>
+                            <option value="BTECH">BTECH</option>
+                            <option value="DEGREE">DEGREE</option>
+                            <option value="BCA">BCA</option>
+                            <option value="BSC">BSC</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Year {{ idx }}</label>
+                        <select name="year_{{ idx }}">
+                            <option value="">Skip</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Branch {{ idx }}</label>
+                        <input type="text" name="branch_{{ idx }}" placeholder="ALL / CSE / ECE">
+                    </div>
+                </div>
+                {% endfor %}
+
+                <h4 style="margin-top: 18px;">Select Classrooms</h4>
+                <div class="room-list">
+                    {% for room in classrooms %}
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="room_ids" value="{{ room.id }}">
+                            <span><strong>{{ room.room_number }}</strong> {% if room.block_name %}({{ room.block_name }}){% endif %} - {{ room.total_seats }} seats</span>
+                        </label>
+                    {% else %}
+                        <p style="color: #64748b;">Add classrooms first before generating a plan.</p>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-top: 18px;">
+                    <button type="submit">Generate Smart Seating</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Selected Plan Details</h3>
+            {% if selected_plan %}
+                <p><strong>{{ selected_plan.exam_name }}</strong> | {{ selected_plan.subject_name }} | {{ selected_plan.exam_date }} | {{ selected_plan.exam_time }}</p>
+                <p style="color: #64748b;">Room number is visible {{ selected_plan.room_reveal_hours_before }} hours before the exam. Exact seat number is visible {{ selected_plan.seat_reveal_minutes_before }} minutes before the exam.</p>
+
+                {% if room_summary %}
+                    <h4>Room Summary</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Room</th>
+                                <th>Allocated Students</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in room_summary %}
+                                <tr>
+                                    <td>{{ row.room_number }}</td>
+                                    <td>{{ row.allocated_students }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+
+                <h4 style="margin-top: 18px;">Invigilator Copy</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Room</th>
+                            <th>Seat</th>
+                            <th>Student</th>
+                            <th>Enrollment</th>
+                            <th>Branch</th>
+                            <th>Course</th>
+                            <th>Year</th>
+                            <th>Group</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in plan_allocations %}
+                            <tr>
+                                <td>{{ item.room_number }}</td>
+                                <td>{{ item.seat_label }}</td>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.username }}</td>
+                                <td>{{ item.branch }}</td>
+                                <td>{{ item.course_type }}</td>
+                                <td>{{ item.year }}</td>
+                                <td>{{ item.group_label }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #64748b;">Generate or open a plan to see the room-wise invigilator copy.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
