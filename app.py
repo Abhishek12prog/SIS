@@ -1,7 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import json
+import math
+import random
 from urllib.parse import urlparse
 
 # ================= SEMESTER LOGIC =================
@@ -134,6 +137,85 @@ def ensure_faculty_feature_tables():
     db.close()
 
 
+def ensure_exam_seating_tables():
+    db = get_db_connection()
+    if db is None:
+        return
+
+    cur = db.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS classrooms (
+            id INT NOT NULL AUTO_INCREMENT,
+            room_number VARCHAR(50) NOT NULL,
+            block_name VARCHAR(100) DEFAULT NULL,
+            total_seats INT NOT NULL,
+            columns_count INT DEFAULT 6,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS exam_seating_plans (
+            id INT NOT NULL AUTO_INCREMENT,
+            exam_name VARCHAR(150) NOT NULL,
+            subject_name VARCHAR(150) NOT NULL,
+            exam_date DATE NOT NULL,
+            exam_time VARCHAR(50) NOT NULL,
+            strategy VARCHAR(50) NOT NULL,
+            room_reveal_hours_before INT DEFAULT 12,
+            seat_reveal_minutes_before INT DEFAULT 10,
+            selected_groups_json LONGTEXT,
+            room_ids_json LONGTEXT,
+            created_by INT DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY created_by (created_by),
+            CONSTRAINT exam_seating_plans_ibfk_1
+                FOREIGN KEY (created_by) REFERENCES admin (admin_id)
+                ON DELETE SET NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS exam_seating_allocations (
+            id INT NOT NULL AUTO_INCREMENT,
+            plan_id INT NOT NULL,
+            student_id INT NOT NULL,
+            classroom_id INT NOT NULL,
+            room_number VARCHAR(50) NOT NULL,
+            seat_number INT NOT NULL,
+            seat_label VARCHAR(20) NOT NULL,
+            row_number INT NOT NULL,
+            col_number INT NOT NULL,
+            group_label VARCHAR(100) NOT NULL,
+            ordering_value VARCHAR(120) DEFAULT NULL,
+            room_visible_at DATETIME NOT NULL,
+            seat_visible_at DATETIME NOT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY plan_id (plan_id),
+            KEY student_id (student_id),
+            KEY classroom_id (classroom_id),
+            CONSTRAINT exam_seating_allocations_ibfk_1
+                FOREIGN KEY (plan_id) REFERENCES exam_seating_plans (id)
+                ON DELETE CASCADE,
+            CONSTRAINT exam_seating_allocations_ibfk_2
+                FOREIGN KEY (student_id) REFERENCES students (student_id)
+                ON DELETE CASCADE,
+            CONSTRAINT exam_seating_allocations_ibfk_3
+                FOREIGN KEY (classroom_id) REFERENCES classrooms (id)
+                ON DELETE CASCADE
+        )
+    """)
+
+    db.commit()
+    cur.close()
+    db.close()
+
+
 def get_logged_in_student():
     if 'student_id' not in session:
         return None
@@ -152,6 +234,140 @@ def get_logged_in_student():
 
 
 ensure_faculty_feature_tables()
+ensure_exam_seating_tables()
+
+
+DAY_ORDER_SQL = "FIELD(day_name, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')"
+
+
+def parse_exam_datetime(exam_date, exam_time):
+    if exam_date is None or exam_time is None:
+        return None
+
+    time_value = str(exam_time).strip()
+    date_value = str(exam_date)
+
+    formats = [
+        "%Y-%m-%d %I:%M %p",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %I %p",
+        "%Y-%m-%d %H"
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(f"{date_value} {time_value}", fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def build_group_label(course_type, year, branch):
+    parts = [course_type.upper(), f"Year {year}"]
+    if branch and branch != "ALL":
+        parts.append(branch.upper())
+    return " - ".join(parts)
+
+
+def get_students_for_group(cur, course_type, year, branch):
+    if branch and branch != "ALL":
+        cur.execute("""
+            SELECT student_id, name, username, branch, year, course_type
+            FROM students
+            WHERE UPPER(course_type)=%s AND year=%s AND UPPER(branch)=%s
+        """, (course_type.upper(), year, branch.upper()))
+    else:
+        cur.execute("""
+            SELECT student_id, name, username, branch, year, course_type
+            FROM students
+            WHERE UPPER(course_type)=%s AND year=%s
+        """, (course_type.upper(), year))
+    return cur.fetchall()
+
+
+def order_students(students, strategy):
+    if strategy == 'alphabetical':
+        return sorted(students, key=lambda item: ((item.get('name') or '').lower(), item['student_id']))
+    if strategy == 'enrollment':
+        return sorted(students, key=lambda item: ((item.get('username') or '').lower(), item['student_id']))
+    if strategy == 'branch_shuffle':
+        return sorted(students, key=lambda item: ((item.get('branch') or '').lower(), (item.get('name') or '').lower(), item['student_id']))
+    return sorted(students, key=lambda item: item['student_id'])
+
+
+def build_seat_positions(total_seats, columns_count):
+    columns = max(columns_count or 6, 1)
+    positions = []
+    for seat_number in range(1, total_seats + 1):
+        row_number = ((seat_number - 1) // columns) + 1
+        col_number = ((seat_number - 1) % columns) + 1
+        seat_label = f"R{row_number}S{col_number}"
+        positions.append({
+            'seat_number': seat_number,
+            'row_number': row_number,
+            'col_number': col_number,
+            'seat_label': seat_label
+        })
+
+    alternate_first = [pos for pos in positions if (pos['row_number'] + pos['col_number']) % 2 == 0]
+    alternate_second = [pos for pos in positions if (pos['row_number'] + pos['col_number']) % 2 == 1]
+    return alternate_first + alternate_second
+
+
+def interleave_grouped_students(grouped_students):
+    working = {key: value[:] for key, value in grouped_students.items()}
+    allocation = []
+
+    while True:
+        available = [key for key, value in working.items() if value]
+        if not available:
+            break
+
+        available.sort(key=lambda key: len(working[key]), reverse=True)
+        for key in available:
+            if working[key]:
+                allocation.append(working[key].pop(0))
+
+    return allocation
+
+
+def generate_seating_allocations(classrooms, grouped_students, exam_datetime, room_reveal_hours_before, seat_reveal_minutes_before):
+    ordered_students = interleave_grouped_students(grouped_students)
+    total_capacity = sum(room['total_seats'] for room in classrooms)
+
+    if len(ordered_students) > total_capacity:
+        return None, f"Not enough seats. Selected classrooms have {total_capacity} seats but {len(ordered_students)} students were chosen."
+
+    room_visible_at = exam_datetime - timedelta(hours=room_reveal_hours_before)
+    seat_visible_at = exam_datetime - timedelta(minutes=seat_reveal_minutes_before)
+
+    allocations = []
+    student_index = 0
+
+    for room in classrooms:
+        seat_positions = build_seat_positions(room['total_seats'], room.get('columns_count'))
+        for position in seat_positions:
+            if student_index >= len(ordered_students):
+                break
+
+            student = ordered_students[student_index]
+            allocations.append({
+                'student_id': student['student_id'],
+                'classroom_id': room['id'],
+                'room_number': room['room_number'],
+                'seat_number': position['seat_number'],
+                'seat_label': position['seat_label'],
+                'row_number': position['row_number'],
+                'col_number': position['col_number'],
+                'group_label': student['group_label'],
+                'ordering_value': student['ordering_value'],
+                'room_visible_at': room_visible_at,
+                'seat_visible_at': seat_visible_at
+            })
+            student_index += 1
+
+    return allocations, None
 
 # ======================================================
 # ======================= HOME =========================
@@ -810,58 +1026,238 @@ def seating():
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
 
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    generated_plan_id = None
+    error_message = None
+
     if request.method == 'POST':
+        action = request.form.get('action')
 
-        type1 = request.form['type1']
-        year1 = int(request.form['year1'])
+        if action == 'generate_plan':
+            exam_name = request.form.get('exam_name', '').strip()
+            subject_name = request.form.get('subject_name', '').strip()
+            exam_date = request.form.get('exam_date')
+            exam_time = request.form.get('exam_time', '').strip()
+            strategy = request.form.get('strategy', 'alphabetical')
+            room_reveal_hours_before = request.form.get('room_reveal_hours_before', type=int) or 12
+            seat_reveal_minutes_before = request.form.get('seat_reveal_minutes_before', type=int) or 10
+            selected_room_ids = request.form.getlist('room_ids')
 
-        type2 = request.form['type2']
-        year2 = int(request.form['year2'])
+            if not exam_name or not subject_name or not exam_date or not exam_time:
+                error_message = "Please fill exam name, subject, date, and time."
+            elif not selected_room_ids:
+                error_message = "Please select at least one classroom."
+            else:
+                exam_datetime = parse_exam_datetime(exam_date, exam_time)
+                if exam_datetime is None:
+                    error_message = "Use exam time in '10:00 AM' or 24-hour format like '14:00'."
+                else:
+                    groups = []
+                    grouped_students = {}
 
-        rooms = int(request.form['rooms'])
-        capacity = int(request.form['capacity'])
+                    for index in range(1, 5):
+                        course_type = request.form.get(f'course_type_{index}', '').strip()
+                        year = request.form.get(f'year_{index}', type=int)
+                        branch = request.form.get(f'branch_{index}', 'ALL').strip() or 'ALL'
+
+                        if not course_type or not year:
+                            continue
+
+                        group_label = build_group_label(course_type, year, branch)
+                        students = get_students_for_group(cur, course_type, year, branch)
+                        ordered = order_students(students, strategy)
+
+                        enriched_students = []
+                        for student in ordered:
+                            item = dict(student)
+                            item['group_label'] = group_label
+                            item['ordering_value'] = item.get('name') if strategy == 'alphabetical' else item.get('username')
+                            enriched_students.append(item)
+
+                        groups.append({
+                            'course_type': course_type.upper(),
+                            'year': year,
+                            'branch': branch.upper(),
+                            'group_label': group_label,
+                            'student_count': len(enriched_students)
+                        })
+                        grouped_students[group_label] = enriched_students
+
+                    if not groups:
+                        error_message = "Please select at least one student group."
+                    else:
+                        placeholders = ','.join(['%s'] * len(selected_room_ids))
+                        cur.execute(f"""
+                            SELECT id, room_number, block_name, total_seats, columns_count
+                            FROM classrooms
+                            WHERE is_active=1 AND id IN ({placeholders})
+                            ORDER BY room_number
+                        """, tuple(selected_room_ids))
+                        selected_rooms = cur.fetchall()
+
+                        allocations, allocation_error = generate_seating_allocations(
+                            selected_rooms,
+                            grouped_students,
+                            exam_datetime,
+                            room_reveal_hours_before,
+                            seat_reveal_minutes_before
+                        )
+
+                        if allocation_error:
+                            error_message = allocation_error
+                        else:
+                            cur.execute("""
+                                INSERT INTO exam_seating_plans
+                                (exam_name, subject_name, exam_date, exam_time, strategy,
+                                 room_reveal_hours_before, seat_reveal_minutes_before,
+                                 selected_groups_json, room_ids_json, created_by)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                exam_name,
+                                subject_name,
+                                exam_date,
+                                exam_time,
+                                strategy,
+                                room_reveal_hours_before,
+                                seat_reveal_minutes_before,
+                                json.dumps(groups),
+                                json.dumps(selected_room_ids),
+                                session.get('admin_id')
+                            ))
+                            generated_plan_id = cur.lastrowid
+
+                            for allocation in allocations:
+                                cur.execute("""
+                                    INSERT INTO exam_seating_allocations
+                                    (plan_id, student_id, classroom_id, room_number, seat_number, seat_label,
+                                     row_number, col_number, group_label, ordering_value,
+                                     room_visible_at, seat_visible_at)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (
+                                    generated_plan_id,
+                                    allocation['student_id'],
+                                    allocation['classroom_id'],
+                                    allocation['room_number'],
+                                    allocation['seat_number'],
+                                    allocation['seat_label'],
+                                    allocation['row_number'],
+                                    allocation['col_number'],
+                                    allocation['group_label'],
+                                    allocation['ordering_value'],
+                                    allocation['room_visible_at'],
+                                    allocation['seat_visible_at']
+                                ))
+
+                            db.commit()
+
+    cur.execute("""
+        SELECT id, room_number, block_name, total_seats, columns_count, is_active
+        FROM classrooms
+        ORDER BY room_number
+    """)
+    classrooms = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, exam_name, subject_name, exam_date, exam_time, strategy, created_at
+        FROM exam_seating_plans
+        ORDER BY exam_date DESC, created_at DESC
+    """)
+    plans = cur.fetchall()
+
+    plan_id = request.args.get('plan_id', type=int) or generated_plan_id
+    selected_plan = None
+    plan_allocations = []
+    room_summary = []
+
+    if plan_id:
+        cur.execute("""
+            SELECT id, exam_name, subject_name, exam_date, exam_time, strategy,
+                   room_reveal_hours_before, seat_reveal_minutes_before,
+                   selected_groups_json, room_ids_json, created_at
+            FROM exam_seating_plans
+            WHERE id=%s
+        """, (plan_id,))
+        selected_plan = cur.fetchone()
+
+        if selected_plan:
+            cur.execute("""
+                SELECT a.room_number, a.seat_label, a.seat_number, a.group_label,
+                       s.student_id, s.name, s.username, s.branch, s.course_type, s.year
+                FROM exam_seating_allocations a
+                JOIN students s ON s.student_id = a.student_id
+                WHERE a.plan_id=%s
+                ORDER BY a.room_number, a.seat_number
+            """, (plan_id,))
+            plan_allocations = cur.fetchall()
+
+            cur.execute("""
+                SELECT room_number, COUNT(*) AS allocated_students
+                FROM exam_seating_allocations
+                WHERE plan_id=%s
+                GROUP BY room_number
+                ORDER BY room_number
+            """, (plan_id,))
+            room_summary = cur.fetchall()
+
+    cur.close()
+    db.close()
+
+    return render_template(
+        'admin_seating.html',
+        classrooms=classrooms,
+        plans=plans,
+        selected_plan=selected_plan,
+        plan_allocations=plan_allocations,
+        room_summary=room_summary,
+        error_message=error_message
+    )
+
+
+@app.route('/classrooms/add', methods=['POST'])
+def add_classroom():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+
+    room_number = request.form.get('room_number', '').strip()
+    block_name = request.form.get('block_name', '').strip()
+    total_seats = request.form.get('total_seats', type=int)
+    columns_count = request.form.get('columns_count', type=int) or 6
+
+    if room_number and total_seats:
         db = get_db_connection()
-        cur = db.cursor(dictionary=True)
-
-        # Group 1
+        cur = db.cursor()
         cur.execute("""
-            SELECT * FROM students
-            WHERE course_type=%s AND year=%s
-            ORDER BY student_id
-        """, (type1, year1))
-        group1 = cur.fetchall()
-
-        # Group 2
-        cur.execute("""
-            SELECT * FROM students
-            WHERE course_type=%s AND year=%s
-            ORDER BY student_id
-        """, (type2, year2))
-        group2 = cur.fetchall()
-        db.close()
+            INSERT INTO classrooms (room_number, block_name, total_seats, columns_count)
+            VALUES (%s, %s, %s, %s)
+        """, (room_number, block_name or None, total_seats, columns_count))
+        db.commit()
         cur.close()
+        db.close()
 
-        seating = []
-        i, j = 0, 0
+    return redirect(url_for('seating'))
 
-        for r in range(rooms):
-            room = []
 
-            for b in range(capacity // 2):
-                if i < len(group1) and j < len(group2):
-                    room.append((group1[i], group2[j]))
-                    i += 1
-                    j += 1
+@app.route('/classrooms/delete/<int:classroom_id>')
+def delete_classroom(classroom_id):
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
 
-            seating.append(room)
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("DELETE FROM classrooms WHERE id=%s", (classroom_id,))
+    db.commit()
+    cur.close()
+    db.close()
+    return redirect(url_for('seating'))
 
-        return render_template(
-            'admin_seating.html',
-            seating=seating,
-            info=f"{type1} Year {year1} + {type2} Year {year2}"
-        )
 
-    return render_template('admin_seating.html')
+@app.route('/seating_plan/<int:plan_id>')
+def seating_plan(plan_id):
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+
+    return redirect(url_for('seating', plan_id=plan_id))
 
 # ================= ADMIN LOGOUT =================
 @app.route('/admin_logout')
@@ -1238,15 +1634,32 @@ def student_examinations():
         return redirect(url_for('student_login'))
 
     db = get_db_connection()
-    cur = db.cursor()
+    cur = db.cursor(dictionary=True)
 
     cur.execute("""
-        SELECT subject_name, exam_date, exam_time
-        FROM exam_subjects
-        WHERE student_id=%s
+        SELECT e.subject_name, e.exam_date, e.exam_time,
+               p.exam_name, a.room_number, a.seat_label,
+               a.room_visible_at, a.seat_visible_at
+        FROM exam_subjects e
+        LEFT JOIN exam_seating_allocations a ON a.student_id = e.student_id
+        LEFT JOIN exam_seating_plans p
+            ON p.id = a.plan_id
+           AND p.subject_name = e.subject_name
+           AND p.exam_date = e.exam_date
+           AND p.exam_time = e.exam_time
+        WHERE e.student_id=%s
+        GROUP BY e.subject_name, e.exam_date, e.exam_time, p.exam_name,
+                 a.room_number, a.seat_label, a.room_visible_at, a.seat_visible_at
+        ORDER BY e.exam_date, e.exam_time
     """, (session['student_id'],))
 
     exams = cur.fetchall()
+    now = datetime.now()
+
+    for exam in exams:
+        exam['room_is_visible'] = bool(exam.get('room_visible_at') and now >= exam['room_visible_at'])
+        exam['seat_is_visible'] = bool(exam.get('seat_visible_at') and now >= exam['seat_visible_at'])
+
     cur.close()
     db.close()
 
