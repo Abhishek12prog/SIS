@@ -301,7 +301,8 @@
                     </div>
                     <div>
                         <label>Subject {{ idx }}</label>
-                        <input type="text" name="subject_name_{{ idx }}" class="group-input" placeholder="Example: DBMS / Signals & Systems">
+                        <input type="text" name="subject_name_{{ idx }}" class="group-input subject-input" list="subject-options-{{ idx }}" placeholder="Choose from available subjects">
+                        <datalist id="subject-options-{{ idx }}"></datalist>
                     </div>
                 </div>
                 <div class="count-box" id="group-count-{{ idx }}">
@@ -418,6 +419,33 @@
     </div>
 </div>
 <script>
+    async function updateSubjectOptions(index) {
+        const course = document.querySelector(`[name="course_type_${index}"]`)?.value || '';
+        const year = document.querySelector(`[name="year_${index}"]`)?.value || '';
+        const branch = document.querySelector(`[name="branch_${index}"]`)?.value || 'ALL';
+        const dataList = document.getElementById(`subject-options-${index}`);
+
+        if (!dataList) return;
+        dataList.innerHTML = '';
+
+        if (!course || !year) return;
+
+        const params = new URLSearchParams({
+            course_type: course,
+            year: year,
+            branch: branch
+        });
+        const response = await fetch(`{{ url_for("seating_subject_options") }}?${params.toString()}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        for (const subject of data.subjects) {
+            const option = document.createElement('option');
+            option.value = subject;
+            dataList.appendChild(option);
+        }
+    }
+
     async function updateSeatingCounts() {
         const form = document.querySelector('form[action="{{ url_for("seating") }}"]');
         if (!form) return;
@@ -452,6 +480,17 @@
         element.addEventListener('input', updateSeatingCounts);
         element.addEventListener('change', updateSeatingCounts);
     });
+
+    for (let i = 1; i <= 4; i++) {
+        ['course_type_', 'year_', 'branch_'].forEach((prefix) => {
+            const element = document.querySelector(`[name="${prefix}${i}"]`);
+            if (element) {
+                element.addEventListener('input', () => updateSubjectOptions(i));
+                element.addEventListener('change', () => updateSubjectOptions(i));
+            }
+        });
+        updateSubjectOptions(i);
+    }
 
     updateSeatingCounts();
 </script>
