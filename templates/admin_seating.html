@@ -301,8 +301,9 @@
                     </div>
                     <div>
                         <label>Subject {{ idx }}</label>
-                        <input type="text" name="subject_name_{{ idx }}" class="group-input subject-input" list="subject-options-{{ idx }}" placeholder="Choose from available subjects">
-                        <datalist id="subject-options-{{ idx }}"></datalist>
+                        <select name="subject_name_{{ idx }}" class="group-input subject-input" id="subject-select-{{ idx }}">
+                            <option value="">Select subject</option>
+                        </select>
                     </div>
                 </div>
                 <div class="count-box" id="group-count-{{ idx }}">
@@ -423,10 +424,12 @@
         const course = document.querySelector(`[name="course_type_${index}"]`)?.value || '';
         const year = document.querySelector(`[name="year_${index}"]`)?.value || '';
         const branch = document.querySelector(`[name="branch_${index}"]`)?.value || 'ALL';
-        const dataList = document.getElementById(`subject-options-${index}`);
+        const subjectSelect = document.getElementById(`subject-select-${index}`);
 
-        if (!dataList) return;
-        dataList.innerHTML = '';
+        if (!subjectSelect) return;
+
+        const previousValue = subjectSelect.value;
+        subjectSelect.innerHTML = '<option value="">Select subject</option>';
 
         if (!course || !year) return;
 
@@ -442,7 +445,11 @@
         for (const subject of data.subjects) {
             const option = document.createElement('option');
             option.value = subject;
-            dataList.appendChild(option);
+            option.textContent = subject;
+            if (subject === previousValue) {
+                option.selected = true;
+            }
+            subjectSelect.appendChild(option);
         }
     }
 
