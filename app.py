@@ -185,6 +185,7 @@ def ensure_exam_seating_tables():
             plan_id INT NOT NULL,
             student_id INT NOT NULL,
             classroom_id INT NOT NULL,
+            subject_name VARCHAR(150) NOT NULL,
             room_number VARCHAR(50) NOT NULL,
             seat_number INT NOT NULL,
             seat_label VARCHAR(20) NOT NULL,
@@ -210,6 +211,15 @@ def ensure_exam_seating_tables():
                 ON DELETE CASCADE
         )
     """)
+
+    try:
+        cur.execute("""
+            ALTER TABLE exam_seating_allocations
+            ADD COLUMN IF NOT EXISTS subject_name VARCHAR(150) NOT NULL
+            AFTER classroom_id
+        """)
+    except Exception as e:
+        print("ALTER exam_seating_allocations skipped:", e)
 
     db.commit()
     cur.close()
@@ -270,19 +280,32 @@ def build_group_label(course_type, year, branch):
     return " - ".join(parts)
 
 
-def get_students_for_group(cur, course_type, year, branch):
+def get_students_for_group(cur, course_type, year, branch, subject_name, exam_date, exam_time):
     if branch and branch != "ALL":
         cur.execute("""
-            SELECT student_id, name, username, branch, year, course_type
-            FROM students
-            WHERE UPPER(course_type)=%s AND year=%s AND UPPER(branch)=%s
-        """, (course_type.upper(), year, branch.upper()))
+            SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type,
+                   e.subject_name
+            FROM students s
+            JOIN exam_subjects e ON e.student_id = s.student_id
+            WHERE UPPER(s.course_type)=%s
+              AND s.year=%s
+              AND UPPER(s.branch)=%s
+              AND UPPER(e.subject_name)=%s
+              AND e.exam_date=%s
+              AND e.exam_time=%s
+        """, (course_type.upper(), year, branch.upper(), subject_name.upper(), exam_date, exam_time))
     else:
         cur.execute("""
-            SELECT student_id, name, username, branch, year, course_type
-            FROM students
-            WHERE UPPER(course_type)=%s AND year=%s
-        """, (course_type.upper(), year))
+            SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type,
+                   e.subject_name
+            FROM students s
+            JOIN exam_subjects e ON e.student_id = s.student_id
+            WHERE UPPER(s.course_type)=%s
+              AND s.year=%s
+              AND UPPER(e.subject_name)=%s
+              AND e.exam_date=%s
+              AND e.exam_time=%s
+        """, (course_type.upper(), year, subject_name.upper(), exam_date, exam_time))
     return cur.fetchall()
 
 
@@ -355,6 +378,7 @@ def generate_seating_allocations(classrooms, grouped_students, exam_datetime, ro
             allocations.append({
                 'student_id': student['student_id'],
                 'classroom_id': room['id'],
+                'subject_name': student['subject_name'],
                 'room_number': room['room_number'],
                 'seat_number': position['seat_number'],
                 'seat_label': position['seat_label'],
@@ -1036,7 +1060,6 @@ def seating():
 
         if action == 'generate_plan':
             exam_name = request.form.get('exam_name', '').strip()
-            subject_name = request.form.get('subject_name', '').strip()
             exam_date = request.form.get('exam_date')
             exam_time = request.form.get('exam_time', '').strip()
             strategy = request.form.get('strategy', 'alphabetical')
@@ -1044,8 +1067,8 @@ def seating():
             seat_reveal_minutes_before = request.form.get('seat_reveal_minutes_before', type=int) or 10
             selected_room_ids = request.form.getlist('room_ids')
 
-            if not exam_name or not subject_name or not exam_date or not exam_time:
-                error_message = "Please fill exam name, subject, date, and time."
+            if not exam_name or not exam_date or not exam_time:
+                error_message = "Please fill exam name, date, and time."
             elif not selected_room_ids:
                 error_message = "Please select at least one classroom."
             else:
@@ -1060,12 +1083,25 @@ def seating():
                         course_type = request.form.get(f'course_type_{index}', '').strip()
                         year = request.form.get(f'year_{index}', type=int)
                         branch = request.form.get(f'branch_{index}', 'ALL').strip() or 'ALL'
+                        subject_name = request.form.get(f'subject_name_{index}', '').strip()
 
                         if not course_type or not year:
                             continue
 
+                        if not subject_name:
+                            error_message = f"Please select the subject for group {index}."
+                            break
+
                         group_label = build_group_label(course_type, year, branch)
-                        students = get_students_for_group(cur, course_type, year, branch)
+                        students = get_students_for_group(
+                            cur,
+                            course_type,
+                            year,
+                            branch,
+                            subject_name,
+                            exam_date,
+                            exam_time
+                        )
                         ordered = order_students(students, strategy)
 
                         enriched_students = []
@@ -1073,18 +1109,22 @@ def seating():
                             item = dict(student)
                             item['group_label'] = group_label
                             item['ordering_value'] = item.get('name') if strategy == 'alphabetical' else item.get('username')
+                            item['subject_name'] = subject_name
                             enriched_students.append(item)
 
                         groups.append({
                             'course_type': course_type.upper(),
                             'year': year,
                             'branch': branch.upper(),
+                            'subject_name': subject_name,
                             'group_label': group_label,
                             'student_count': len(enriched_students)
                         })
                         grouped_students[group_label] = enriched_students
 
-                    if not groups:
+                    if error_message:
+                        pass
+                    elif not groups:
                         error_message = "Please select at least one student group."
                     else:
                         placeholders = ','.join(['%s'] * len(selected_room_ids))
@@ -1115,7 +1155,7 @@ def seating():
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """, (
                                 exam_name,
-                                subject_name,
+                                'Mixed Session',
                                 exam_date,
                                 exam_time,
                                 strategy,
@@ -1130,14 +1170,15 @@ def seating():
                             for allocation in allocations:
                                 cur.execute("""
                                     INSERT INTO exam_seating_allocations
-                                    (plan_id, student_id, classroom_id, room_number, seat_number, seat_label,
+                                    (plan_id, student_id, classroom_id, subject_name, room_number, seat_number, seat_label,
                                      seat_row, seat_column, group_label, ordering_value,
                                      room_visible_at, seat_visible_at)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """, (
                                     generated_plan_id,
                                     allocation['student_id'],
                                     allocation['classroom_id'],
+                                    allocation['subject_name'],
                                     allocation['room_number'],
                                     allocation['seat_number'],
                                     allocation['seat_label'],
@@ -1167,6 +1208,7 @@ def seating():
 
     plan_id = request.args.get('plan_id', type=int) or generated_plan_id
     selected_plan = None
+    selected_plan_groups = []
     plan_allocations = []
     room_summary = []
 
@@ -1181,8 +1223,14 @@ def seating():
         selected_plan = cur.fetchone()
 
         if selected_plan:
+            if selected_plan.get('selected_groups_json'):
+                try:
+                    selected_plan_groups = json.loads(selected_plan['selected_groups_json'])
+                except Exception:
+                    selected_plan_groups = []
+
             cur.execute("""
-                SELECT a.room_number, a.seat_label, a.seat_number, a.group_label,
+                SELECT a.room_number, a.subject_name, a.seat_label, a.seat_number, a.group_label,
                        s.student_id, s.name, s.username, s.branch, s.course_type, s.year
                 FROM exam_seating_allocations a
                 JOIN students s ON s.student_id = a.student_id
@@ -1208,6 +1256,7 @@ def seating():
         classrooms=classrooms,
         plans=plans,
         selected_plan=selected_plan,
+        selected_plan_groups=selected_plan_groups,
         plan_allocations=plan_allocations,
         room_summary=room_summary,
         error_message=error_message
@@ -1641,10 +1690,11 @@ def student_examinations():
                p.exam_name, a.room_number, a.seat_label,
                a.room_visible_at, a.seat_visible_at
         FROM exam_subjects e
-        LEFT JOIN exam_seating_allocations a ON a.student_id = e.student_id
+        LEFT JOIN exam_seating_allocations a
+            ON a.student_id = e.student_id
+           AND a.subject_name = e.subject_name
         LEFT JOIN exam_seating_plans p
             ON p.id = a.plan_id
-           AND p.subject_name = e.subject_name
            AND p.exam_date = e.exam_date
            AND p.exam_time = e.exam_time
         WHERE e.student_id=%s
