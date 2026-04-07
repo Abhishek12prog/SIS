@@ -106,6 +106,22 @@
         margin-bottom: 16px;
     }
 
+    .count-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        color: #475569;
+        font-size: 13px;
+    }
+
+    .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+    }
+
     @media (max-width: 1100px) {
         .layout {
             grid-template-columns: 1fr;
@@ -201,7 +217,7 @@
                                 <td>{{ plan.exam_name }}</td>
                                 <td>{{ plan.subject_name }}</td>
                                 <td>{{ plan.exam_date }}</td>
-                                <td>{{ plan.exam_time }}</td>
+                                <td>{{ plan.exam_time }}{% if plan.exam_end_time %} - {{ plan.exam_end_time }}{% endif %}</td>
                                 <td><span class="pill">{{ plan.strategy }}</span></td>
                                 <td><a class="button-link" href="{{ url_for('seating_plan', plan_id=plan.id) }}">View</a></td>
                             </tr>
@@ -234,6 +250,10 @@
                         <input type="text" name="exam_time" placeholder="10:00 AM" required>
                     </div>
                     <div>
+                        <label>Exam End Time</label>
+                        <input type="text" name="exam_end_time" placeholder="01:00 PM" required>
+                    </div>
+                    <div>
                         <label>Strategy</label>
                         <select name="strategy">
                             <option value="alphabetical">Alphabetical</option>
@@ -257,7 +277,7 @@
                 <div class="mini-grid" style="margin-bottom: 10px;">
                     <div>
                         <label>Course {{ idx }}</label>
-                        <select name="course_type_{{ idx }}">
+                        <select name="course_type_{{ idx }}" class="group-input">
                             <option value="">Skip</option>
                             <option value="BTECH">BTECH</option>
                             <option value="DEGREE">DEGREE</option>
@@ -267,7 +287,7 @@
                     </div>
                     <div>
                         <label>Year {{ idx }}</label>
-                        <select name="year_{{ idx }}">
+                        <select name="year_{{ idx }}" class="group-input">
                             <option value="">Skip</option>
                             <option value="1">1</option>
                             <option value="2">2</option>
@@ -277,14 +297,22 @@
                     </div>
                     <div>
                         <label>Branch {{ idx }}</label>
-                        <input type="text" name="branch_{{ idx }}" placeholder="ALL / CSE / ECE">
+                        <input type="text" name="branch_{{ idx }}" class="group-input" placeholder="ALL / CSE / ECE">
                     </div>
                     <div>
                         <label>Subject {{ idx }}</label>
-                        <input type="text" name="subject_name_{{ idx }}" placeholder="Example: DBMS / Signals & Systems">
+                        <input type="text" name="subject_name_{{ idx }}" class="group-input" placeholder="Example: DBMS / Signals & Systems">
                     </div>
                 </div>
+                <div class="count-box" id="group-count-{{ idx }}">
+                    Branch/year total: 0 | Subject-matched students: 0
+                </div>
                 {% endfor %}
+
+                <div class="summary-strip">
+                    <div class="count-box" id="overall-branch-total">Selected branch/year total: 0</div>
+                    <div class="count-box" id="overall-matched-total">Subject-matched total: 0</div>
+                </div>
 
                 <h4 style="margin-top: 18px;">Select Classrooms</h4>
                 <div class="room-list">
@@ -307,7 +335,7 @@
         <div class="card">
             <h3>Selected Plan Details</h3>
             {% if selected_plan %}
-                <p><strong>{{ selected_plan.exam_name }}</strong> | {{ selected_plan.exam_date }} | {{ selected_plan.exam_time }}</p>
+                <p><strong>{{ selected_plan.exam_name }}</strong> | {{ selected_plan.exam_date }} | {{ selected_plan.exam_time }}{% if selected_plan.exam_end_time %} - {{ selected_plan.exam_end_time }}{% endif %}</p>
                 <p style="color: #64748b;">Room number is visible {{ selected_plan.room_reveal_hours_before }} hours before the exam. Exact seat number is visible {{ selected_plan.seat_reveal_minutes_before }} minutes before the exam.</p>
 
                 {% if selected_plan_groups %}
@@ -389,4 +417,42 @@
         </div>
     </div>
 </div>
+<script>
+    async function updateSeatingCounts() {
+        const form = document.querySelector('form[action="{{ url_for("seating") }}"]');
+        if (!form) return;
+
+        const params = new URLSearchParams(new FormData(form));
+        const response = await fetch(`{{ url_for("seating_group_counts") }}?${params.toString()}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        for (let i = 1; i <= 4; i++) {
+            const box = document.getElementById(`group-count-${i}`);
+            if (box) {
+                box.textContent = 'Branch/year total: 0 | Subject-matched students: 0';
+            }
+        }
+
+        for (const group of data.groups) {
+            const box = document.getElementById(`group-count-${group.index}`);
+            if (box) {
+                box.textContent = `Branch/year total: ${group.branch_year_total} | Subject-matched students: ${group.matched_total}`;
+            }
+        }
+
+        document.getElementById('overall-branch-total').textContent =
+            `Selected branch/year total: ${data.totals.branch_year_total}`;
+        document.getElementById('overall-matched-total').textContent =
+            `Subject-matched total: ${data.totals.matched_total}`;
+    }
+
+    document.querySelectorAll('.group-input, input[name="exam_date"], input[name="exam_time"]').forEach((element) => {
+        element.addEventListener('input', updateSeatingCounts);
+        element.addEventListener('change', updateSeatingCounts);
+    });
+
+    updateSeatingCounts();
+</script>
 {% endblock %}
