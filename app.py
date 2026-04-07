@@ -58,6 +58,101 @@ def get_db_connection():
         print("DATABASE CONNECTION ERROR:", e)
         return None
 
+
+def ensure_faculty_feature_tables():
+    db = get_db_connection()
+    if db is None:
+        return
+
+    cur = db.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_schedule (
+            id INT NOT NULL AUTO_INCREMENT,
+            faculty_id INT NOT NULL,
+            title VARCHAR(120) NOT NULL,
+            day_name VARCHAR(20) NOT NULL,
+            start_time VARCHAR(20) NOT NULL,
+            end_time VARCHAR(20) NOT NULL,
+            location VARCHAR(120) DEFAULT NULL,
+            availability_note VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY faculty_id (faculty_id),
+            CONSTRAINT faculty_schedule_ibfk_1
+                FOREIGN KEY (faculty_id) REFERENCES admin (admin_id)
+                ON DELETE CASCADE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_meeting_requests (
+            id INT NOT NULL AUTO_INCREMENT,
+            student_id INT NOT NULL,
+            faculty_id INT NOT NULL,
+            request_message TEXT NOT NULL,
+            preferred_slot VARCHAR(120) DEFAULT NULL,
+            status VARCHAR(20) DEFAULT 'Pending',
+            faculty_response VARCHAR(255) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+                ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY student_id (student_id),
+            KEY faculty_id (faculty_id),
+            CONSTRAINT faculty_meeting_requests_ibfk_1
+                FOREIGN KEY (student_id) REFERENCES students (student_id)
+                ON DELETE CASCADE,
+            CONSTRAINT faculty_meeting_requests_ibfk_2
+                FOREIGN KEY (faculty_id) REFERENCES admin (admin_id)
+                ON DELETE CASCADE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_chat_messages (
+            id INT NOT NULL AUTO_INCREMENT,
+            student_id INT NOT NULL,
+            faculty_id INT NOT NULL,
+            sender_role VARCHAR(20) NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY student_id (student_id),
+            KEY faculty_id (faculty_id),
+            CONSTRAINT faculty_chat_messages_ibfk_1
+                FOREIGN KEY (student_id) REFERENCES students (student_id)
+                ON DELETE CASCADE,
+            CONSTRAINT faculty_chat_messages_ibfk_2
+                FOREIGN KEY (faculty_id) REFERENCES admin (admin_id)
+                ON DELETE CASCADE
+        )
+    """)
+
+    db.commit()
+    cur.close()
+    db.close()
+
+
+def get_logged_in_student():
+    if 'student_id' not in session:
+        return None
+
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT student_id, name, branch, email
+        FROM students
+        WHERE student_id=%s
+    """, (session['student_id'],))
+    student = cur.fetchone()
+    cur.close()
+    db.close()
+    return student
+
+
+ensure_faculty_feature_tables()
+
 # ======================================================
 # ======================= HOME =========================
 # ======================================================
@@ -87,6 +182,7 @@ def admin_login():
         db.close()
 
         if admin:
+            session['admin_id'] = admin[0]
             session['admin'] = admin[1]
             return redirect(url_for('admin_dashboard'))
         else:
@@ -129,6 +225,180 @@ def admin_dashboard():
         total_tickets=total_tickets,
         branch_data=branch_data
     )
+
+
+@app.route('/faculty_portal')
+def faculty_portal():
+    if 'admin' not in session or 'admin_id' not in session:
+        return redirect(url_for('admin_login'))
+
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    faculty_id = session['admin_id']
+    selected_student_id = request.args.get('student_id', type=int)
+
+    cur.execute("""
+        SELECT id, title, day_name, start_time, end_time, location, availability_note
+        FROM faculty_schedule
+        WHERE faculty_id=%s
+        ORDER BY FIELD(day_name, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+                 start_time
+    """, (faculty_id,))
+    schedules = cur.fetchall()
+
+    cur.execute("""
+        SELECT r.id, r.student_id, s.name AS student_name, s.branch,
+               r.request_message, r.preferred_slot, r.status,
+               r.faculty_response, r.created_at
+        FROM faculty_meeting_requests r
+        JOIN students s ON s.student_id = r.student_id
+        WHERE r.faculty_id=%s
+        ORDER BY r.created_at DESC
+    """, (faculty_id,))
+    meeting_requests = cur.fetchall()
+
+    cur.execute("""
+        SELECT DISTINCT s.student_id, s.name, s.branch,
+               MAX(m.created_at) AS last_message_at
+        FROM faculty_chat_messages m
+        JOIN students s ON s.student_id = m.student_id
+        WHERE m.faculty_id=%s
+        GROUP BY s.student_id, s.name, s.branch
+        ORDER BY last_message_at DESC
+    """, (faculty_id,))
+    chat_students = cur.fetchall()
+
+    if selected_student_id is None and chat_students:
+        selected_student_id = chat_students[0]['student_id']
+
+    selected_student = None
+    chat_messages = []
+    if selected_student_id:
+        cur.execute("""
+            SELECT student_id, name, branch, email
+            FROM students
+            WHERE student_id=%s
+        """, (selected_student_id,))
+        selected_student = cur.fetchone()
+
+        cur.execute("""
+            SELECT sender_role, message, created_at
+            FROM faculty_chat_messages
+            WHERE faculty_id=%s AND student_id=%s
+            ORDER BY created_at ASC
+        """, (faculty_id, selected_student_id))
+        chat_messages = cur.fetchall()
+
+    cur.close()
+    db.close()
+
+    return render_template(
+        'admin_faculty_portal.html',
+        schedules=schedules,
+        meeting_requests=meeting_requests,
+        chat_students=chat_students,
+        selected_student=selected_student,
+        chat_messages=chat_messages
+    )
+
+
+@app.route('/faculty_schedule/add', methods=['POST'])
+def add_faculty_schedule():
+    if 'admin' not in session or 'admin_id' not in session:
+        return redirect(url_for('admin_login'))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        INSERT INTO faculty_schedule
+        (faculty_id, title, day_name, start_time, end_time, location, availability_note)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (
+        session['admin_id'],
+        request.form.get('title'),
+        request.form.get('day_name'),
+        request.form.get('start_time'),
+        request.form.get('end_time'),
+        request.form.get('location'),
+        request.form.get('availability_note')
+    ))
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('faculty_portal'))
+
+
+@app.route('/faculty_schedule/delete/<int:schedule_id>')
+def delete_faculty_schedule(schedule_id):
+    if 'admin' not in session or 'admin_id' not in session:
+        return redirect(url_for('admin_login'))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        DELETE FROM faculty_schedule
+        WHERE id=%s AND faculty_id=%s
+    """, (schedule_id, session['admin_id']))
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('faculty_portal'))
+
+
+@app.route('/faculty_request/<int:request_id>/<action>')
+def update_faculty_request(request_id, action):
+    if 'admin' not in session or 'admin_id' not in session:
+        return redirect(url_for('admin_login'))
+
+    if action not in ['approve', 'reject']:
+        return redirect(url_for('faculty_portal'))
+
+    status = 'Approved' if action == 'approve' else 'Rejected'
+    faculty_response = request.args.get(
+        'response',
+        'Please come to the cabin during the approved slot.' if action == 'approve'
+        else 'I am not available in that slot. Please send another request.'
+    )
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        UPDATE faculty_meeting_requests
+        SET status=%s, faculty_response=%s
+        WHERE id=%s AND faculty_id=%s
+    """, (status, faculty_response, request_id, session['admin_id']))
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('faculty_portal'))
+
+
+@app.route('/faculty_chat/reply', methods=['POST'])
+def faculty_chat_reply():
+    if 'admin' not in session or 'admin_id' not in session:
+        return redirect(url_for('admin_login'))
+
+    student_id = request.form.get('student_id', type=int)
+    message = request.form.get('message', '').strip()
+
+    if not student_id or not message:
+        return redirect(url_for('faculty_portal', student_id=student_id))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        INSERT INTO faculty_chat_messages
+        (student_id, faculty_id, sender_role, message)
+        VALUES (%s, %s, %s, %s)
+    """, (student_id, session['admin_id'], 'faculty', message))
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('faculty_portal', student_id=student_id))
 
 
 @app.route('/students')
@@ -203,6 +473,8 @@ def add_student():
             return f"Error: {e}"
 
     return render_template('add_student.html')
+
+
 @app.route('/branches')
 def branches():
     if 'admin' not in session:
@@ -629,6 +901,135 @@ def student_dashboard():
 
     return render_template('base_student.html')
 
+
+@app.route('/faculty_connect')
+def faculty_connect():
+    student = get_logged_in_student()
+    if not student:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+
+    cur.execute("""
+        SELECT a.admin_id, a.username,
+               COUNT(fs.id) AS schedule_count
+        FROM admin a
+        LEFT JOIN faculty_schedule fs ON fs.faculty_id = a.admin_id
+        GROUP BY a.admin_id, a.username
+        ORDER BY a.username
+    """)
+    faculty_members = cur.fetchall()
+
+    selected_faculty_id = request.args.get('faculty_id', type=int)
+    if selected_faculty_id is None and faculty_members:
+        selected_faculty_id = faculty_members[0]['admin_id']
+
+    schedules = []
+    requests_data = []
+    chat_messages = []
+    selected_faculty = None
+
+    if selected_faculty_id:
+        cur.execute("""
+            SELECT admin_id, username
+            FROM admin
+            WHERE admin_id=%s
+        """, (selected_faculty_id,))
+        selected_faculty = cur.fetchone()
+
+        cur.execute("""
+            SELECT title, day_name, start_time, end_time, location, availability_note
+            FROM faculty_schedule
+            WHERE faculty_id=%s
+            ORDER BY FIELD(day_name, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+                     start_time
+        """, (selected_faculty_id,))
+        schedules = cur.fetchall()
+
+        cur.execute("""
+            SELECT id, request_message, preferred_slot, status,
+                   faculty_response, created_at
+            FROM faculty_meeting_requests
+            WHERE student_id=%s AND faculty_id=%s
+            ORDER BY created_at DESC
+        """, (student['student_id'], selected_faculty_id))
+        requests_data = cur.fetchall()
+
+        cur.execute("""
+            SELECT sender_role, message, created_at
+            FROM faculty_chat_messages
+            WHERE student_id=%s AND faculty_id=%s
+            ORDER BY created_at ASC
+        """, (student['student_id'], selected_faculty_id))
+        chat_messages = cur.fetchall()
+
+    cur.close()
+    db.close()
+
+    return render_template(
+        'student_faculty_connect.html',
+        student=student,
+        faculty_members=faculty_members,
+        selected_faculty=selected_faculty,
+        schedules=schedules,
+        meeting_requests=requests_data,
+        chat_messages=chat_messages
+    )
+
+
+@app.route('/faculty_request_meeting', methods=['POST'])
+def faculty_request_meeting():
+    student = get_logged_in_student()
+    if not student:
+        return redirect(url_for('student_login'))
+
+    faculty_id = request.form.get('faculty_id', type=int)
+    request_message = request.form.get('request_message', '').strip()
+    preferred_slot = request.form.get('preferred_slot', '').strip()
+
+    if not faculty_id or not request_message:
+        return redirect(url_for('faculty_connect', faculty_id=faculty_id))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        INSERT INTO faculty_meeting_requests
+        (student_id, faculty_id, request_message, preferred_slot)
+        VALUES (%s, %s, %s, %s)
+    """, (student['student_id'], faculty_id, request_message, preferred_slot or None))
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('faculty_connect', faculty_id=faculty_id))
+
+
+@app.route('/faculty_chat/send', methods=['POST'])
+def faculty_chat_send():
+    student = get_logged_in_student()
+    if not student:
+        return redirect(url_for('student_login'))
+
+    faculty_id = request.form.get('faculty_id', type=int)
+    message = request.form.get('message', '').strip()
+
+    if not faculty_id or not message:
+        return redirect(url_for('faculty_connect', faculty_id=faculty_id))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        INSERT INTO faculty_chat_messages
+        (student_id, faculty_id, sender_role, message)
+        VALUES (%s, %s, %s, %s)
+    """, (student['student_id'], faculty_id, 'student', message))
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('faculty_connect', faculty_id=faculty_id))
+
 @app.route('/notice_board')
 def notice_board():
     if 'student_id' not in session:
@@ -787,7 +1188,10 @@ def courses():
 
 @app.route('/faculty')
 def faculty():
-    return render_template('student_academics.html')
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    return redirect(url_for('faculty_connect'))
 
 
 @app.route('/attendance')
