@@ -61,7 +61,7 @@
                 <td>{{ loop.index }}</td>
                 <td>{{ exam.subject_name }}</td>
                 <td>{{ exam.exam_date }}</td>
-                <td>{{ exam.exam_time }}</td>
+                <td>{{ exam.exam_time }}{% if exam.exam_end_time %} - {{ exam.exam_end_time }}{% endif %}</td>
                 <td>
                     {% if exam.room_number and exam.room_is_visible %}
                         <span class="pill">{{ exam.room_number }}</span>
