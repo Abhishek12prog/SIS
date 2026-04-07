@@ -188,8 +188,8 @@ def ensure_exam_seating_tables():
             room_number VARCHAR(50) NOT NULL,
             seat_number INT NOT NULL,
             seat_label VARCHAR(20) NOT NULL,
-            row_number INT NOT NULL,
-            col_number INT NOT NULL,
+            seat_row INT NOT NULL,
+            seat_column INT NOT NULL,
             group_label VARCHAR(100) NOT NULL,
             ordering_value VARCHAR(120) DEFAULT NULL,
             room_visible_at DATETIME NOT NULL,
@@ -300,18 +300,18 @@ def build_seat_positions(total_seats, columns_count):
     columns = max(columns_count or 6, 1)
     positions = []
     for seat_number in range(1, total_seats + 1):
-        row_number = ((seat_number - 1) // columns) + 1
-        col_number = ((seat_number - 1) % columns) + 1
-        seat_label = f"R{row_number}S{col_number}"
+        seat_row = ((seat_number - 1) // columns) + 1
+        seat_column = ((seat_number - 1) % columns) + 1
+        seat_label = f"R{seat_row}S{seat_column}"
         positions.append({
             'seat_number': seat_number,
-            'row_number': row_number,
-            'col_number': col_number,
+            'seat_row': seat_row,
+            'seat_column': seat_column,
             'seat_label': seat_label
         })
 
-    alternate_first = [pos for pos in positions if (pos['row_number'] + pos['col_number']) % 2 == 0]
-    alternate_second = [pos for pos in positions if (pos['row_number'] + pos['col_number']) % 2 == 1]
+    alternate_first = [pos for pos in positions if (pos['seat_row'] + pos['seat_column']) % 2 == 0]
+    alternate_second = [pos for pos in positions if (pos['seat_row'] + pos['seat_column']) % 2 == 1]
     return alternate_first + alternate_second
 
 
@@ -358,8 +358,8 @@ def generate_seating_allocations(classrooms, grouped_students, exam_datetime, ro
                 'room_number': room['room_number'],
                 'seat_number': position['seat_number'],
                 'seat_label': position['seat_label'],
-                'row_number': position['row_number'],
-                'col_number': position['col_number'],
+                'seat_row': position['seat_row'],
+                'seat_column': position['seat_column'],
                 'group_label': student['group_label'],
                 'ordering_value': student['ordering_value'],
                 'room_visible_at': room_visible_at,
@@ -1131,7 +1131,7 @@ def seating():
                                 cur.execute("""
                                     INSERT INTO exam_seating_allocations
                                     (plan_id, student_id, classroom_id, room_number, seat_number, seat_label,
-                                     row_number, col_number, group_label, ordering_value,
+                                     seat_row, seat_column, group_label, ordering_value,
                                      room_visible_at, seat_visible_at)
                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """, (
@@ -1141,8 +1141,8 @@ def seating():
                                     allocation['room_number'],
                                     allocation['seat_number'],
                                     allocation['seat_label'],
-                                    allocation['row_number'],
-                                    allocation['col_number'],
+                                    allocation['seat_row'],
+                                    allocation['seat_column'],
                                     allocation['group_label'],
                                     allocation['ordering_value'],
                                     allocation['room_visible_at'],
