@@ -357,6 +357,14 @@ def column_exists(cur, table_name, column_name):
     return cur.fetchone()[0] > 0
 
 
+def first_value(row):
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return next(iter(row.values()), None)
+    return row[0]
+
+
 def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date=None, exam_time=None):
     course_types = resolve_course_types(course_type, branch)
     branch_value = (branch or "ALL").upper()
@@ -373,7 +381,7 @@ def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date
         total_params.append(branch_value)
 
     cur.execute(total_query, tuple(total_params))
-    branch_year_total = cur.fetchone()[0]
+    branch_year_total = first_value(cur.fetchone()) or 0
 
     matched_total = 0
     if subject_name and exam_date and exam_time:
@@ -393,7 +401,7 @@ def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date
             matched_params.append(branch_value)
 
         cur.execute(matched_query, tuple(matched_params))
-        matched_total = cur.fetchone()[0]
+        matched_total = first_value(cur.fetchone()) or 0
 
     return {
         "branch_year_total": branch_year_total,
