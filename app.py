@@ -1009,9 +1009,12 @@ def branches():
     cur = db.cursor(dictionary=True)
 
     cur.execute("""
-        SELECT branch, year, COUNT(*) AS student_count
+        SELECT UPPER(TRIM(branch)) AS branch, year, COUNT(*) AS student_count
         FROM students
-        WHERE branch IS NOT NULL AND branch != ''
+        WHERE branch IS NOT NULL
+          AND TRIM(branch) != ''
+          AND year IS NOT NULL
+          AND year BETWEEN 1 AND 8
         GROUP BY branch, year
         ORDER BY branch, year
     """)
@@ -1061,19 +1064,22 @@ def branch_students(branch_name):
 
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
+    normalized_branch_name = (branch_name or '').strip().upper()
 
     cur.execute("""
         SELECT student_id, name, email, branch, username, year, semester,
                joining_year, course_type, phone
         FROM students
-        WHERE branch=%s
+        WHERE UPPER(TRIM(branch))=%s
+          AND year IS NOT NULL
+          AND year BETWEEN 1 AND 8
         ORDER BY year, name
-    """, (branch_name,))
+    """, (normalized_branch_name,))
     students = cur.fetchall()
 
     students_by_year = {}
     for student in students:
-        year_key = student.get('year') if student.get('year') is not None else 'Unknown Year'
+        year_key = student.get('year')
         students_by_year.setdefault(year_key, []).append(student)
 
     ordered_students_by_year = {}
@@ -1097,7 +1103,7 @@ def branch_students(branch_name):
         'branch_students.html',
         students=students,
         students_by_year=ordered_students_by_year,
-        branch=branch_name
+        branch=normalized_branch_name
     )
 @app.route('/edit_student/<int:student_id>', methods=['GET', 'POST'])
 def edit_student(student_id):
