@@ -489,6 +489,17 @@ def order_students(students, strategy):
     return sorted(students, key=lambda item: item['student_id'])
 
 
+def remove_duplicate_students(students, seen_student_ids):
+    unique_students = []
+    for student in students:
+        student_id = student.get('student_id')
+        if student_id in seen_student_ids:
+            continue
+        seen_student_ids.add(student_id)
+        unique_students.append(student)
+    return unique_students
+
+
 def build_seat_positions(total_seats, columns_count):
     columns = max(columns_count or 6, 1)
     positions = []
@@ -1460,6 +1471,7 @@ def seating():
                     else:
                         groups = []
                         grouped_students = {}
+                        seen_student_ids = set()
 
                         for index in range(1, 5):
                             course_type = request.form.get(f'course_type_{index}', '').strip()
@@ -1490,9 +1502,10 @@ def seating():
                                 subject_name
                             )
                             ordered = order_students(students, strategy)
+                            unique_ordered = remove_duplicate_students(ordered, seen_student_ids)
 
                             enriched_students = []
-                            for student in ordered:
+                            for student in unique_ordered:
                                 item = dict(student)
                                 item['group_label'] = group_label
                                 item['ordering_value'] = item.get('name') if strategy == 'alphabetical' else item.get('username')
