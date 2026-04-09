@@ -78,16 +78,16 @@
     <div class="branch-grid">
         {% for branch in branches %}
         <div class="branch-card">
-            <a href="{{ url_for('branch_students', branch_name=branch.name) }}">
-                {{ branch.name }}
+            <a href="{{ url_for('branch_students', branch_name=branch['name']) }}">
+                {{ branch['name'] }}
             </a>
-            <div class="branch-total">Total students: {{ branch.total_students }}</div>
+            <div class="branch-total">Total students: {{ branch['total_students'] }}</div>
 
             <div class="year-list">
-                {% for item in branch.years %}
+                {% for item in branch['years'] %}
                 <div class="year-item">
-                    <span>Year {{ item.year }}</span>
-                    <span>{{ item.student_count }} students</span>
+                    <span>Year {{ item['year'] }}</span>
+                    <span>{{ item['student_count'] }} students</span>
                 </div>
                 {% endfor %}
             </div>
