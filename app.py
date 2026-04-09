@@ -544,6 +544,18 @@ def interleave_grouped_students(grouped_students):
     return allocation
 
 
+def dedupe_allocation_students(students):
+    seen_student_ids = set()
+    unique_students = []
+    for student in students:
+        student_id = student.get('student_id')
+        if student_id in seen_student_ids:
+            continue
+        seen_student_ids.add(student_id)
+        unique_students.append(student)
+    return unique_students
+
+
 def sanitize_filename(value):
     cleaned = []
     for char in (value or ""):
@@ -626,7 +638,7 @@ def build_group_pdf(plan, group_label, allocations):
 
 
 def generate_seating_allocations(classrooms, grouped_students, exam_datetime, room_reveal_hours_before, seat_reveal_minutes_before):
-    ordered_students = interleave_grouped_students(grouped_students)
+    ordered_students = dedupe_allocation_students(interleave_grouped_students(grouped_students))
     total_capacity = sum(room['total_seats'] for room in classrooms)
 
     if len(ordered_students) > total_capacity:
@@ -1601,16 +1613,17 @@ def seating():
                                 item['subject_name'] = subject_name
                                 enriched_students.append(item)
 
-                            groups.append({
-                                'course_type': course_type.upper(),
-                                'year': year,
-                                'branch': branch.upper(),
-                                'subject_name': subject_name,
-                                'group_label': group_label,
-                                'branch_year_total': stats['branch_year_total'],
-                                'student_count': len(enriched_students)
-                            })
-                            grouped_students[group_label] = enriched_students
+                            if enriched_students:
+                                groups.append({
+                                    'course_type': course_type.upper(),
+                                    'year': year,
+                                    'branch': branch.upper(),
+                                    'subject_name': subject_name,
+                                    'group_label': group_label,
+                                    'branch_year_total': stats['branch_year_total'],
+                                    'student_count': len(enriched_students)
+                                })
+                                grouped_students[group_label] = enriched_students
 
                         if error_message:
                             pass
