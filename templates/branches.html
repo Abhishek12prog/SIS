@@ -86,7 +86,7 @@
             <div class="year-list">
                 {% for item in branch['years'] %}
                 <div class="year-item">
-                    <span>{% if item['year'] == 'Unknown Year' %}{{ item['year'] }}{% else %}Year {{ item['year'] }}{% endif %}</span>
+                    <span>Year {{ item['year'] }}</span>
                     <span>{{ item['student_count'] }} students</span>
                 </div>
                 {% endfor %}
