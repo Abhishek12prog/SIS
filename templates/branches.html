@@ -9,56 +9,96 @@
 
     .branch-title {
         font-size: 24px;
-        margin-bottom: 20px;
+        margin-bottom: 8px;
         color: #1f2933;
+    }
+
+    .branch-subtitle {
+        margin-bottom: 20px;
+        color: #64748b;
     }
 
     .branch-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 20px;
     }
 
     .branch-card {
         background: white;
         padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        transition: 0.3s;
-        cursor: pointer;
-    }
-
-    .branch-card:hover {
-        transform: translateY(-5px);
-        background: #2563eb;
-        color: white;
+        border-radius: 16px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+        border: 1px solid #dbeafe;
     }
 
     .branch-card a {
         text-decoration: none;
-        color: inherit;
-        font-weight: bold;
+        color: #0f172a;
+        font-weight: 700;
         font-size: 18px;
+    }
+
+    .branch-total {
+        margin: 8px 0 14px;
+        color: #475569;
+        font-size: 14px;
+    }
+
+    .year-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .year-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: #1e3a8a;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        color: #64748b;
+        text-align: center;
     }
 </style>
 
 <div class="branch-container">
+    <div class="branch-title">Branches</div>
+    <div class="branch-subtitle">Students are segregated by year in each branch for quick admin access.</div>
 
-    <div class="branch-title">📚 Branches</div>
-
+    {% if branches %}
     <div class="branch-grid">
-
         {% for branch in branches %}
         <div class="branch-card">
-            <a href="{{ url_for('branch_students', branch_name=branch[0]) }}">
-                {{ branch[0] }}
+            <a href="{{ url_for('branch_students', branch_name=branch.name) }}">
+                {{ branch.name }}
             </a>
+            <div class="branch-total">Total students: {{ branch.total_students }}</div>
+
+            <div class="year-list">
+                {% for item in branch.years %}
+                <div class="year-item">
+                    <span>Year {{ item.year }}</span>
+                    <span>{{ item.student_count }} students</span>
+                </div>
+                {% endfor %}
+            </div>
         </div>
         {% endfor %}
-
     </div>
-
+    {% else %}
+    <div class="empty-state">
+        No branch data found.
+    </div>
+    {% endif %}
 </div>
 
 {% endblock %}
