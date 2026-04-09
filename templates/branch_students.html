@@ -1,30 +1,102 @@
 {% extends "base_admin.html" %}
 
 {% block content %}
+<style>
+    .branch-page-title {
+        margin-bottom: 8px;
+        color: #0f172a;
+    }
 
-<h2>Students in {{ branch }}</h2>
+    .branch-page-subtitle {
+        margin-bottom: 20px;
+        color: #64748b;
+    }
 
-<table border="1" cellpadding="10" style="width:100%; background:white;">
-    <tr style="background:#1f2933; color:white;">
-        <th>ID</th>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Username</th>
-        <th>Year</th>
-        <th>Phone</th>
-    </tr>
+    .year-card {
+        background: #ffffff;
+        border: 1px solid #dbeafe;
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 18px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
 
-    {% for student in students %}
-    <tr>
-        <td>{{ student[0] }}</td>
-        <td>{{ student[1] }}</td>
-        <td>{{ student[2] }}</td>
-        <td>{{ student[4] }}</td>
-        <td>{{ student[6] }}</td>
-        <td>{{ student[10] }}</td>
-    </tr>
+    .year-card h3 {
+        margin: 0 0 14px;
+        color: #1d4ed8;
+    }
+
+    .student-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+
+    .student-table th,
+    .student-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+    }
+
+    .student-table th {
+        background: #eff6ff;
+        color: #1e3a8a;
+        font-size: 14px;
+    }
+
+    .student-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .empty-state {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        color: #64748b;
+        text-align: center;
+    }
+</style>
+
+<h2 class="branch-page-title">Students in {{ branch }}</h2>
+<p class="branch-page-subtitle">
+    This branch is separated by year for easier management. Total visible students: <strong>{{ students|length }}</strong>
+</p>
+
+{% if students_by_year %}
+    {% for year, year_students in students_by_year.items() %}
+    <div class="year-card">
+        <h3>Year {{ year }} ({{ year_students|length }} students)</h3>
+
+        <table class="student-table">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Username</th>
+                <th>Semester</th>
+                <th>Course</th>
+                <th>Phone</th>
+            </tr>
+
+            {% for student in year_students %}
+            <tr>
+                <td>{{ student.student_id }}</td>
+                <td>{{ student.name }}</td>
+                <td>{{ student.email }}</td>
+                <td>{{ student.username }}</td>
+                <td>{{ student.semester }}</td>
+                <td>{{ student.course_type }}</td>
+                <td>{{ student.phone }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
     {% endfor %}
-
-</table>
+{% else %}
+    <div class="empty-state">
+        No students found in this branch.
+    </div>
+{% endif %}
 
 {% endblock %}
