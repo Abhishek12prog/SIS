@@ -29,6 +29,7 @@ def calculate_semester(joining_year, course_type):
     else:
         return min(max(sem, 1), 6)
 
+
 # ================= FLASK APP =================
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv("SECRET_KEY", "fallback_key")
