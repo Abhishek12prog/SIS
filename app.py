@@ -1006,33 +1006,93 @@ def branches():
         return redirect(url_for('admin_login'))
 
     db = get_db_connection()
-    cur = db.cursor()
+    cur = db.cursor(dictionary=True)
 
-    # Get unique branches from students table
-    cur.execute("SELECT DISTINCT branch FROM students")
-    branches = cur.fetchall()
+    cur.execute("""
+        SELECT branch, year, COUNT(*) AS student_count
+        FROM students
+        WHERE branch IS NOT NULL AND branch != ''
+        GROUP BY branch, year
+        ORDER BY branch, year
+    """)
+    rows = cur.fetchall()
+
+    branches = {}
+    for row in rows:
+        branch_name = row.get('branch') or 'Unknown Branch'
+        year_value = row.get('year') if row.get('year') is not None else 'Unknown Year'
+        branches.setdefault(branch_name, [])
+        branches[branch_name].append({
+            'year': year_value,
+            'student_count': row.get('student_count', 0)
+        })
+
+    ordered_branches = []
+    for branch_name in sorted(branches):
+        ordered_years = sorted(
+            branches[branch_name],
+            key=lambda item: (
+                isinstance(item['year'], str),
+                item['year'] if isinstance(item['year'], int) else 999,
+                str(item['year'])
+            )
+        )
+        ordered_branches.append({
+            'name': branch_name,
+            'years': ordered_years,
+            'total_students': sum(item['student_count'] for item in ordered_years)
+        })
 
     cur.close()
     db.close()
 
-    return render_template('branches.html', branches=branches)
+    return render_template('branches.html', branches=ordered_branches)
 
 @app.route('/branch/<branch_name>')
 def branch_students(branch_name):
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
 
-    
     db = get_db_connection()
-    cur = db.cursor()
+    cur = db.cursor(dictionary=True)
 
-    cur.execute("SELECT * FROM students WHERE branch=%s", (branch_name,))
+    cur.execute("""
+        SELECT student_id, name, email, branch, username, year, semester,
+               joining_year, course_type, phone
+        FROM students
+        WHERE branch=%s
+        ORDER BY year, name
+    """, (branch_name,))
     students = cur.fetchall()
+
+    students_by_year = {}
+    for student in students:
+        year_key = student.get('year') if student.get('year') is not None else 'Unknown Year'
+        students_by_year.setdefault(year_key, []).append(student)
+
+    ordered_students_by_year = {}
+    year_keys = sorted(
+        students_by_year,
+        key=lambda value: (isinstance(value, str), value if isinstance(value, int) else 999, str(value))
+    )
+    for year_key in year_keys:
+        ordered_students_by_year[year_key] = sorted(
+            students_by_year[year_key],
+            key=lambda item: (
+                (item.get('name') or '').lower(),
+                item.get('student_id', 0)
+            )
+        )
 
     cur.close()
     db.close()
 
-    return render_template('branch_students.html', students=students, branch=branch_name)
+    return render_template(
+        'branch_students.html',
+        students=students,
+        students_by_year=ordered_students_by_year,
+        branch=branch_name
+    )
 @app.route('/edit_student/<int:student_id>', methods=['GET', 'POST'])
 def edit_student(student_id):
     if 'admin' not in session:
