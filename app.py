@@ -1017,31 +1017,37 @@ def branches():
     """)
     rows = cur.fetchall()
 
-    branches = {}
+    branch_map = {}
     for row in rows:
-        branch_name = row.get('branch') or 'Unknown Branch'
+        branch_name = (row.get('branch') or 'Unknown Branch').strip()
         year_value = row.get('year') if row.get('year') is not None else 'Unknown Year'
-        branches.setdefault(branch_name, [])
-        branches[branch_name].append({
+        student_count = row.get('student_count') or 0
+
+        if branch_name not in branch_map:
+            branch_map[branch_name] = {
+                'name': branch_name,
+                'years': [],
+                'total_students': 0
+            }
+
+        branch_map[branch_name]['years'].append({
             'year': year_value,
-            'student_count': row.get('student_count', 0)
+            'student_count': student_count
         })
+        branch_map[branch_name]['total_students'] += student_count
 
     ordered_branches = []
-    for branch_name in sorted(branches):
-        ordered_years = sorted(
-            branches[branch_name],
+    for branch_name in sorted(branch_map):
+        branch_item = branch_map[branch_name]
+        branch_item['years'] = sorted(
+            branch_item['years'],
             key=lambda item: (
                 isinstance(item['year'], str),
                 item['year'] if isinstance(item['year'], int) else 999,
                 str(item['year'])
             )
         )
-        ordered_branches.append({
-            'name': branch_name,
-            'years': ordered_years,
-            'total_students': sum(item['student_count'] for item in ordered_years)
-        })
+        ordered_branches.append(branch_item)
 
     cur.close()
     db.close()
