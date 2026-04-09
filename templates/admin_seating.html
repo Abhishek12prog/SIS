@@ -348,6 +348,7 @@
                                 <th>Group</th>
                                 <th>Subject</th>
                                 <th>Students</th>
+                                <th>PDF</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -356,6 +357,9 @@
                                     <td>{{ group.group_label }}</td>
                                     <td>{{ group.subject_name }}</td>
                                     <td>{{ group.student_count }}</td>
+                                    <td>
+                                        <a class="button-link" href="{{ url_for('seating_group_pdf', plan_id=selected_plan.id, group_label=group.group_label) }}">Download PDF</a>
+                                    </td>
                                 </tr>
                             {% endfor %}
                         </tbody>
