@@ -1071,11 +1071,15 @@ def branch_students(branch_name):
                joining_year, course_type, phone
         FROM students
         WHERE UPPER(TRIM(branch))=%s
-          AND year IS NOT NULL
-          AND year BETWEEN 1 AND 8
         ORDER BY year, name
     """, (normalized_branch_name,))
-    students = cur.fetchall()
+    raw_students = cur.fetchall()
+
+    students = []
+    for student in raw_students:
+        year_value = student.get('year')
+        if isinstance(year_value, int) and 1 <= year_value <= 8:
+            students.append(student)
 
     students_by_year = {}
     for student in students:
