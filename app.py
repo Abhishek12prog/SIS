@@ -384,24 +384,12 @@ def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date
     branch_year_total = first_value(cur.fetchone()) or 0
 
     matched_total = 0
-    if subject_name and exam_date and exam_time:
-        matched_query = f"""
-            SELECT COUNT(DISTINCT s.student_id)
-            FROM students s
-            JOIN exam_subjects e ON e.student_id = s.student_id
-            WHERE UPPER(s.course_type) IN {build_in_clause(course_types)}
-              AND s.year=%s
-              AND UPPER(e.subject_name)=%s
-              AND e.exam_date=%s
-              AND e.exam_time=%s
-        """
-        matched_params = list(course_types) + [year, subject_name.upper(), exam_date, exam_time]
-        if branch_value != "ALL" and branch_value not in ["BCA", "BSC"]:
-            matched_query += " AND UPPER(s.branch)=%s"
-            matched_params.append(branch_value)
-
-        cur.execute(matched_query, tuple(matched_params))
-        matched_total = first_value(cur.fetchone()) or 0
+    if subject_name:
+        available_subjects = {
+            value.upper() for value in get_available_subjects(cur, course_type, year, branch)
+        }
+        if subject_name.upper() in available_subjects:
+            matched_total = branch_year_total
 
     return {
         "branch_year_total": branch_year_total,
@@ -409,27 +397,66 @@ def get_group_stats(cur, course_type, year, branch, subject_name=None, exam_date
     }
 
 
-def get_students_for_group(cur, course_type, year, branch, subject_name, exam_date, exam_time):
+def get_students_for_group(cur, course_type, year, branch, subject_name):
     course_types = resolve_course_types(course_type, branch)
     branch_value = (branch or "ALL").upper()
+    available_subjects = {
+        value.upper() for value in get_available_subjects(cur, course_type, year, branch)
+    }
+    if subject_name.upper() not in available_subjects:
+        return []
+
     query = f"""
-        SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type,
-               e.subject_name
+        SELECT DISTINCT s.student_id, s.name, s.username, s.branch, s.year, s.course_type
         FROM students s
-        JOIN exam_subjects e ON e.student_id = s.student_id
         WHERE UPPER(s.course_type) IN {build_in_clause(course_types)}
           AND s.year=%s
-          AND UPPER(e.subject_name)=%s
-          AND e.exam_date=%s
-          AND e.exam_time=%s
     """
-    params = list(course_types) + [year, subject_name.upper(), exam_date, exam_time]
+    params = list(course_types) + [year]
     if branch_value != "ALL" and branch_value not in ["BCA", "BSC"]:
         query += " AND UPPER(s.branch)=%s"
         params.append(branch_value)
 
     cur.execute(query, tuple(params))
-    return cur.fetchall()
+    students = cur.fetchall()
+    for student in students:
+        student['subject_name'] = subject_name
+    return students
+
+
+def ensure_exam_subject_entries(cur, students, subject_name, exam_date, exam_time):
+    normalized_subject = (subject_name or "").strip()
+    if not normalized_subject or not exam_date or not exam_time:
+        return
+
+    for student in students:
+        cur.execute("""
+            SELECT 1
+            FROM exam_subjects
+            WHERE student_id=%s
+              AND UPPER(subject_name)=%s
+              AND exam_date=%s
+              AND exam_time=%s
+            LIMIT 1
+        """, (
+            student['student_id'],
+            normalized_subject.upper(),
+            exam_date,
+            exam_time
+        ))
+        exists = cur.fetchone()
+        if exists:
+            continue
+
+        cur.execute("""
+            INSERT INTO exam_subjects (student_id, subject_name, exam_date, exam_time)
+            VALUES (%s, %s, %s, %s)
+        """, (
+            student['student_id'],
+            normalized_subject,
+            exam_date,
+            exam_time
+        ))
 
 
 def get_available_subjects(cur, course_type, year, branch):
@@ -443,7 +470,7 @@ def get_available_subjects(cur, course_type, year, branch):
             WHERE UPPER(branch)=%s AND year=%s
             ORDER BY subject_name
         """, (subject_branch.upper(), year))
-        subject_sets.append({row[0] for row in cur.fetchall()})
+        subject_sets.append({first_value(row) for row in cur.fetchall() if first_value(row)})
 
     if not subject_sets:
         return []
@@ -795,26 +822,141 @@ def students():
         if db is None:
             return "Database connection failed"
 
-        search = request.args.get('search')
+        search = request.args.get('search', '').strip()
+        selected_course = request.args.get('course_type', '').strip().upper()
+        selected_batch = request.args.get('batch', type=int)
+        selected_year = request.args.get('year', type=int)
+        selected_branch = request.args.get('branch', '').strip().upper()
 
-        cur = db.cursor()
+        cur = db.cursor(dictionary=True)
+
+        filters = []
+        params = []
 
         if search:
-            query = """
-                SELECT * FROM students 
-                WHERE name LIKE %s OR username LIKE %s
-            """
+            filters.append("(name LIKE %s OR username LIKE %s OR email LIKE %s)")
             value = f"%{search}%"
-            cur.execute(query, (value, value))
-        else:
-            cur.execute("SELECT * FROM students")
+            params.extend([value, value, value])
+
+        if selected_course:
+            filters.append("UPPER(course_type)=%s")
+            params.append(selected_course)
+
+        if selected_batch:
+            filters.append("joining_year=%s")
+            params.append(selected_batch)
+
+        if selected_year:
+            filters.append("year=%s")
+            params.append(selected_year)
+
+        if selected_branch:
+            filters.append("UPPER(branch)=%s")
+            params.append(selected_branch)
+
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+        cur.execute(f"""
+            SELECT student_id, name, email, branch, username, year, semester,
+                   joining_year, course_type, phone
+            FROM students
+            {where_clause}
+            ORDER BY course_type, joining_year, year, branch, name
+        """, tuple(params))
 
         students = cur.fetchall()
+
+        raw_grouped_students = {}
+        for student in students:
+            course_key = (student.get('course_type') or 'UNKNOWN').upper()
+            batch_key = student.get('joining_year') if student.get('joining_year') is not None else 'Unknown Batch'
+            year_key = student.get('year') if student.get('year') is not None else 'Unknown Year'
+            branch_key = (student.get('branch') or 'UNKNOWN').upper()
+
+            raw_grouped_students.setdefault(course_key, {})
+            raw_grouped_students[course_key].setdefault(batch_key, {})
+            raw_grouped_students[course_key][batch_key].setdefault(year_key, {})
+            raw_grouped_students[course_key][batch_key][year_key].setdefault(branch_key, [])
+            raw_grouped_students[course_key][batch_key][year_key][branch_key].append(student)
+
+        grouped_students = {}
+        for course_key in sorted(raw_grouped_students):
+            grouped_students[course_key] = {}
+            batch_map = raw_grouped_students[course_key]
+            batch_keys = sorted(
+                batch_map,
+                key=lambda value: (isinstance(value, str), -(value if isinstance(value, int) else 0), str(value))
+            )
+
+            for batch_key in batch_keys:
+                grouped_students[course_key][batch_key] = {}
+                year_map = batch_map[batch_key]
+                year_keys = sorted(
+                    year_map,
+                    key=lambda value: (isinstance(value, str), value if isinstance(value, int) else 999, str(value))
+                )
+
+                for year_key in year_keys:
+                    branch_map = year_map[year_key]
+                    grouped_students[course_key][batch_key][year_key] = {}
+
+                    for branch_key in sorted(branch_map):
+                        grouped_students[course_key][batch_key][year_key][branch_key] = sorted(
+                            branch_map[branch_key],
+                            key=lambda item: (
+                                (item.get('name') or '').lower(),
+                                item.get('student_id', 0)
+                            )
+                        )
+
+        cur.execute("""
+            SELECT DISTINCT UPPER(course_type) AS course_type
+            FROM students
+            ORDER BY course_type
+        """)
+        course_options = [row['course_type'] for row in cur.fetchall() if row.get('course_type')]
+
+        cur.execute("""
+            SELECT DISTINCT joining_year
+            FROM students
+            WHERE joining_year IS NOT NULL
+            ORDER BY joining_year DESC
+        """)
+        batch_options = [row['joining_year'] for row in cur.fetchall() if row.get('joining_year')]
+
+        cur.execute("""
+            SELECT DISTINCT year
+            FROM students
+            WHERE year IS NOT NULL
+            ORDER BY year
+        """)
+        year_options = [row['year'] for row in cur.fetchall() if row.get('year')]
+
+        cur.execute("""
+            SELECT DISTINCT UPPER(branch) AS branch
+            FROM students
+            WHERE branch IS NOT NULL AND branch != ''
+            ORDER BY branch
+        """)
+        branch_options = [row['branch'] for row in cur.fetchall() if row.get('branch')]
 
         cur.close()
         db.close()
 
-        return render_template('students.html', students=students)
+        return render_template(
+            'students.html',
+            students=students,
+            grouped_students=grouped_students,
+            course_options=course_options,
+            batch_options=batch_options,
+            year_options=year_options,
+            branch_options=branch_options,
+            selected_course=selected_course,
+            selected_batch=selected_batch,
+            selected_year=selected_year,
+            selected_branch=selected_branch,
+            search=search
+        )
 
     except Exception as e:
         return f"ERROR: {e}"
@@ -1262,18 +1404,14 @@ def seating():
                                 course_type,
                                 year,
                                 branch,
-                                subject_name,
-                                exam_date,
-                                exam_time
+                                subject_name
                             )
                             students = get_students_for_group(
                                 cur,
                                 course_type,
                                 year,
                                 branch,
-                                subject_name,
-                                exam_date,
-                                exam_time
+                                subject_name
                             )
                             ordered = order_students(students, strategy)
 
@@ -1327,6 +1465,15 @@ def seating():
                             if allocation_error:
                                 error_message = allocation_error
                             else:
+                                for group_students in grouped_students.values():
+                                    ensure_exam_subject_entries(
+                                        cur,
+                                        group_students,
+                                        group_students[0]['subject_name'] if group_students else None,
+                                        exam_date,
+                                        exam_time
+                                    )
+
                                 cur.execute("""
                                     INSERT INTO exam_seating_plans
                                     (exam_name, subject_name, exam_date, exam_time, exam_end_time, strategy,
