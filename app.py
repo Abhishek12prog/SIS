@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file
 import mysql.connector
 from datetime import datetime, timedelta
 import os
 import json
 import math
 import random
+from io import BytesIO
 from urllib.parse import urlparse
 
 # ================= SEMESTER LOGIC =================
@@ -514,26 +515,114 @@ def build_seat_positions(total_seats, columns_count):
             'seat_label': seat_label
         })
 
-    alternate_first = [pos for pos in positions if (pos['seat_row'] + pos['seat_column']) % 2 == 0]
-    alternate_second = [pos for pos in positions if (pos['seat_row'] + pos['seat_column']) % 2 == 1]
-    return alternate_first + alternate_second
+    return positions
 
 
 def interleave_grouped_students(grouped_students):
-    working = {key: value[:] for key, value in grouped_students.items()}
+    working = [(key, value[:]) for key, value in grouped_students.items() if value]
     allocation = []
 
-    while True:
-        available = [key for key, value in working.items() if value]
-        if not available:
+    while working:
+        next_working = []
+        progressed = False
+
+        for key, students in working:
+            if not students:
+                continue
+
+            allocation.append(students.pop(0))
+            progressed = True
+
+            if students:
+                next_working.append((key, students))
+
+        if not progressed:
             break
 
-        available.sort(key=lambda key: len(working[key]), reverse=True)
-        for key in available:
-            if working[key]:
-                allocation.append(working[key].pop(0))
+        working = next_working
 
     return allocation
+
+
+def sanitize_filename(value):
+    cleaned = []
+    for char in (value or ""):
+        if char.isalnum() or char in ("-", "_"):
+            cleaned.append(char)
+        elif char in (" ", "/", "\\"):
+            cleaned.append("_")
+    result = "".join(cleaned).strip("_")
+    return result or "seating"
+
+
+def build_group_pdf(plan, group_label, allocations):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm
+    )
+    styles = getSampleStyleSheet()
+
+    story = [
+        Paragraph(f"Seating Plan - {group_label}", styles["Title"]),
+        Paragraph(
+            f"{plan['exam_name']} | {plan['exam_date']} | {plan['exam_time']}"
+            + (f" - {plan['exam_end_time']}" if plan.get('exam_end_time') else ""),
+            styles["Normal"]
+        ),
+        Spacer(1, 8)
+    ]
+
+    table_data = [[
+        "Seat No",
+        "Room No",
+        "Student ID",
+        "Student Name",
+        "Enrollment",
+        "Branch",
+        "Course",
+        "Year",
+        "Subject"
+    ]]
+
+    for item in allocations:
+        table_data.append([
+            item.get('seat_label'),
+            item.get('room_number'),
+            item.get('student_id'),
+            item.get('name'),
+            item.get('username'),
+            item.get('branch'),
+            item.get('course_type'),
+            item.get('year'),
+            item.get('subject_name')
+        ])
+
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#22313f")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(table)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 
 def generate_seating_allocations(classrooms, grouped_students, exam_datetime, room_reveal_hours_before, seat_reveal_minutes_before):
@@ -541,7 +630,7 @@ def generate_seating_allocations(classrooms, grouped_students, exam_datetime, ro
     total_capacity = sum(room['total_seats'] for room in classrooms)
 
     if len(ordered_students) > total_capacity:
-        return None, f"Not enough seats. Selected classrooms have {total_capacity} seats but {len(ordered_students)} students were chosen."
+        return None, "Not enough rooms available to allocate all students."
 
     room_visible_at = exam_datetime - timedelta(hours=room_reveal_hours_before)
     seat_visible_at = exam_datetime - timedelta(minutes=seat_reveal_minutes_before)
@@ -1819,6 +1908,47 @@ def seating_plan(plan_id):
         return redirect(url_for('admin_login'))
 
     return redirect(url_for('seating', plan_id=plan_id))
+
+
+@app.route('/seating_plan/<int:plan_id>/group_pdf')
+def seating_group_pdf(plan_id):
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+
+    group_label = request.args.get('group_label', '').strip()
+    if not group_label:
+        return redirect(url_for('seating', plan_id=plan_id))
+
+    db = get_db_connection()
+    if db is None:
+        return redirect(url_for('seating', plan_id=plan_id))
+
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT exam_name, exam_date, exam_time, exam_end_time
+        FROM exam_seating_plans
+        WHERE id=%s
+    """, (plan_id,))
+    plan = cur.fetchone()
+
+    cur.execute("""
+        SELECT a.room_number, a.seat_label, a.group_label, a.subject_name,
+               s.student_id, s.name, s.username, s.branch, s.course_type, s.year
+        FROM exam_seating_allocations a
+        JOIN students s ON s.student_id = a.student_id
+        WHERE a.plan_id=%s AND a.group_label=%s
+        ORDER BY a.room_number, a.seat_number
+    """, (plan_id, group_label))
+    allocations = cur.fetchall()
+    cur.close()
+    db.close()
+
+    if not plan or not allocations:
+        return redirect(url_for('seating', plan_id=plan_id))
+
+    pdf_buffer = build_group_pdf(plan, group_label, allocations)
+    filename = f"{sanitize_filename(plan['exam_name'])}_{sanitize_filename(group_label)}.pdf"
+    return send_file(pdf_buffer, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
 # ================= ADMIN LOGOUT =================
 @app.route('/admin_logout')
