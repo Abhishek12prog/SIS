@@ -1,0 +1,54 @@
+{% extends "base_student.html" %}
+{% block content %}
+<style>
+    .page-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+    }
+
+    .detail-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px;
+    }
+
+    .label {
+        display: block;
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 6px;
+    }
+ </style>
+
+<div class="page-card">
+    <h2 style="margin-top: 0;">Registration</h2>
+    <p style="color: #64748b;">Your current registration profile in SIS.</p>
+
+    {% if student %}
+    <div class="details-grid">
+        <div class="detail-box"><span class="label">Student ID</span>{{ student.student_id }}</div>
+        <div class="detail-box"><span class="label">Name</span>{{ student.name }}</div>
+        <div class="detail-box"><span class="label">Email</span>{{ student.email }}</div>
+        <div class="detail-box"><span class="label">Username</span>{{ student.username }}</div>
+        <div class="detail-box"><span class="label">Course</span>{{ student.course_type }}</div>
+        <div class="detail-box"><span class="label">Branch</span>{{ student.branch }}</div>
+        <div class="detail-box"><span class="label">Year</span>{{ student.year }}</div>
+        <div class="detail-box"><span class="label">Semester</span>{{ student.semester }}</div>
+        <div class="detail-box"><span class="label">Joining Year</span>{{ student.joining_year }}</div>
+        <div class="detail-box"><span class="label">Phone</span>{{ student.phone }}</div>
+    </div>
+    {% else %}
+    <p style="color: #64748b;">Registration details are not available.</p>
+    {% endif %}
+</div>
+{% endblock %}
