@@ -1,85 +1,49 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My Courses</title>
+{% extends "base_student.html" %}
+{% block content %}
+<style>
+    .page-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #0f172a;
-            margin: 0;
-            padding: 20px;
-            color: white;
-        }
+    .muted {
+        color: #64748b;
+    }
 
-        h2 {
-            text-align: center;
-            margin-bottom: 10px;
-        }
+    .courses-container {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+    }
 
-        .info {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #cbd5f5;
-        }
+    .course-card {
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+</style>
 
-        /* COLUMN STYLE */
-        .courses-container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            max-width: 600px;
-            margin: auto;
-        }
+<div class="page-card">
+    <h2 style="margin-top: 0;">My Courses</h2>
+    <p class="muted">Branch: {{ student.branch }} | Semester: {{ sem }}</p>
 
-        .course-card {
-            background: linear-gradient(135deg, #1e293b, #334155);
-            padding: 15px 20px;
-            border-radius: 12px;
-            transition: 0.3s;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            cursor: pointer;
-
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .course-card:hover {
-            transform: translateX(8px);
-            box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-        }
-
-        .course-title {
-            font-size: 16px;
-            font-weight: 500;
-        }
-
-        /* Optional small arrow */
-        .arrow {
-            font-size: 18px;
-            color: #38bdf8;
-        }
-
-    </style>
-</head>
-
-<body>
-
-<h2>📚 My Courses</h2>
-
-<div class="info">
-    <p>Branch: {{ student.branch }} | Semester: {{ sem }}</p>
-</div>
-
-<div class="courses-container">
-    {% for sub in subjects %}
-    <div class="course-card">
-        <div class="course-title">{{ sub.subject_name }}</div>
-        <div class="arrow">→</div>
+    {% if subjects %}
+    <div class="courses-container">
+        {% for sub in subjects %}
+        <div class="course-card">
+            <strong>{{ sub.subject_name }}</strong>
+            <span class="muted">Semester {{ sem }}</span>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
+    {% else %}
+    <p class="muted">No courses are available for this semester yet.</p>
+    {% endif %}
 </div>
-
-</body>
-</html>
+{% endblock %}
