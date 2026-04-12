@@ -2659,7 +2659,21 @@ def resources():
     if 'student_id' not in session:
         return redirect(url_for('student_login'))
 
-    return render_template('student_resources.html')
+    db = get_db_connection()
+    if db is None:
+        return render_template('student_resources.html', resources=[])
+
+    cur = db.cursor()
+    cur.execute("""
+        SELECT id, title, file_name, uploaded_at
+        FROM documents
+        ORDER BY uploaded_at DESC, id DESC
+    """)
+    resources = cur.fetchall()
+    cur.close()
+    db.close()
+
+    return render_template('student_resources.html', resources=resources)
 
 
 @app.route('/mentor')
