@@ -1,0 +1,26 @@
+{% extends "base_student.html" %}
+{% block content %}
+<div style="background:#ffffff; border-radius:18px; padding:24px; box-shadow:0 10px 24px rgba(15, 23, 42, 0.08);">
+    <h2 style="margin-top:0;">Grade List</h2>
+    {% if grade_rows %}
+    <table border="1" cellpadding="10" style="width:100%; background:white; border-collapse:collapse;">
+        <tr style="background:#1f2933; color:white;">
+            <th>Subject</th>
+            <th>Total Marks</th>
+            <th>Grade</th>
+            <th>Semester</th>
+        </tr>
+        {% for row in grade_rows %}
+        <tr>
+            <td>{{ row.subject_name }}</td>
+            <td>{{ row.total_marks }}</td>
+            <td>{{ row.grade }}</td>
+            <td>{{ row.semester }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p style="color:#64748b;">No grades are available yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
