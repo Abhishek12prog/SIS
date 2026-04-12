@@ -98,6 +98,8 @@
 
 </head>
 <body>
+    {% set academics_endpoints = ['registration', 'courses', 'my_faculty', 'attendance', 'resources', 'mentor', 'marks', 'grades'] %}
+    {% set academics_open = request.endpoint in academics_endpoints %}
 
     <!-- ===== TOP NAVBAR ===== -->
     <div class="topbar">
@@ -118,21 +120,21 @@
         <a href="{{ url_for('fees') }}">💰 Fee</a>
 
         <!-- ===== ACADEMICS DROPDOWN ===== -->
-        <div class="menu-title" onclick="toggleAcademics()">
+        <div class="menu-title {% if academics_open %}active{% endif %}" onclick="toggleAcademics()">
             <span>📘 Academics</span>
-            <span id="arrow">▶</span>
+            <span id="arrow">{% if academics_open %}▼{% else %}▶{% endif %}</span>
         </div>
 
-        <div id="academicsMenu" class="submenu">
-            <a href="{{ url_for('registration') }}">Registration</a>
-            <a href="{{ url_for('courses') }}">Courses</a>
-            <a href="{{ url_for('faculty_connect') }}">My Faculty</a>
-            <a href="{{ url_for('attendance') }}">My Attendance</a>
+        <div id="academicsMenu" class="submenu" style="display: {% if academics_open %}block{% else %}none{% endif %};">
+            <a href="{{ url_for('registration') }}" class="{% if request.endpoint=='registration' %}active{% endif %}">Registration</a>
+            <a href="{{ url_for('courses') }}" class="{% if request.endpoint=='courses' %}active{% endif %}">Courses</a>
+            <a href="{{ url_for('my_faculty') }}" class="{% if request.endpoint=='my_faculty' %}active{% endif %}">My Faculty</a>
+            <a href="{{ url_for('attendance') }}" class="{% if request.endpoint=='attendance' %}active{% endif %}">My Attendance</a>
             <a href="{{ url_for('student_documents') }}">Documents</a>
-            <a href="{{ url_for('resources') }}">Resources</a>
-            <a href="{{ url_for('mentor') }}">Mentor</a>
-            <a href="{{ url_for('marks') }}">Consolidated Marks List</a>
-            <a href="{{ url_for('grades') }}">Grade List</a>
+            <a href="{{ url_for('resources') }}" class="{% if request.endpoint=='resources' %}active{% endif %}">Resources</a>
+            <a href="{{ url_for('mentor') }}" class="{% if request.endpoint=='mentor' %}active{% endif %}">Mentor</a>
+            <a href="{{ url_for('marks') }}" class="{% if request.endpoint=='marks' %}active{% endif %}">Consolidated Marks List</a>
+            <a href="{{ url_for('grades') }}" class="{% if request.endpoint=='grades' %}active{% endif %}">Grade List</a>
         </div>
 
         <a href="{{ url_for('hall_ticket') }}">🎫 Hall Ticket</a>
