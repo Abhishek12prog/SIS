@@ -1,12 +1,63 @@
 {% extends "base_student.html" %}
 {% block content %}
-<div style="background:#ffffff; border-radius:18px; padding:24px; box-shadow:0 10px 24px rgba(15, 23, 42, 0.08);">
+<style>
+    .page-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .resource-list {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+    }
+
+    .resource-card {
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .download-link {
+        padding: 10px 14px;
+        background: #22313f;
+        color: #ffffff;
+        border-radius: 10px;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .muted {
+        color: #64748b;
+    }
+</style>
+
+<div class="page-card">
     <h2 style="margin-top:0;">Resources</h2>
-    <p style="color:#64748b;">Academic resources provided by admin will appear here.</p>
-    <div style="margin-top:18px; display:grid; gap:12px;">
-        <div style="background:#eff6ff; border:1px solid #dbeafe; border-radius:14px; padding:14px;">Class notes and study material</div>
-        <div style="background:#eff6ff; border:1px solid #dbeafe; border-radius:14px; padding:14px;">Reference documents</div>
-        <div style="background:#eff6ff; border:1px solid #dbeafe; border-radius:14px; padding:14px;">Department circulars and uploads</div>
+    <p class="muted">Resources uploaded by admin are available here for students to download.</p>
+
+    {% if resources %}
+    <div class="resource-list">
+        {% for resource in resources %}
+        <div class="resource-card">
+            <div>
+                <strong>{{ resource[1] }}</strong><br>
+                <span class="muted">{{ resource[2] }}</span><br>
+                <span class="muted">Uploaded: {{ resource[3] }}</span>
+            </div>
+            <a class="download-link" href="{{ url_for('static', filename='uploads/' + resource[2]) }}" download>Download</a>
+        </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <p class="muted">No resources have been uploaded by admin yet.</p>
+    {% endif %}
 </div>
 {% endblock %}
