@@ -1,0 +1,41 @@
+{% extends "base_student.html" %}
+{% block content %}
+<style>
+    .page-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .info-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin: 18px 0;
+    }
+
+    .info-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px;
+    }
+</style>
+
+<div class="page-card">
+    <h2 style="margin-top: 0;">My Attendance</h2>
+    <p style="color: #64748b;">Attendance module page for the student portal.</p>
+
+    {% if student %}
+    <div class="info-strip">
+        <div class="info-box"><strong>{{ student.course_type }}</strong><br><span style="color:#64748b;">Course</span></div>
+        <div class="info-box"><strong>{{ student.branch }}</strong><br><span style="color:#64748b;">Branch</span></div>
+        <div class="info-box"><strong>{{ student.year }}</strong><br><span style="color:#64748b;">Year</span></div>
+        <div class="info-box"><strong>{{ student.semester }}</strong><br><span style="color:#64748b;">Semester</span></div>
+    </div>
+    {% endif %}
+
+    <p style="color: #64748b;">Attendance records are not available in the database yet, but this section now has its own dedicated page.</p>
+</div>
+{% endblock %}
