@@ -38,7 +38,7 @@
         {% for sub in subjects %}
         <div class="course-card">
             <strong>{{ sub.subject_name }}</strong>
-            <span class="muted">Semester {{ sem }}</span>
+            <span class="muted">{{ sub.branch }} | Semester {{ sub.semester }}</span>
         </div>
         {% endfor %}
     </div>
