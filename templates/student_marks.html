@@ -1,0 +1,28 @@
+{% extends "base_student.html" %}
+{% block content %}
+<div style="background:#ffffff; border-radius:18px; padding:24px; box-shadow:0 10px 24px rgba(15, 23, 42, 0.08);">
+    <h2 style="margin-top:0;">Consolidated Marks List</h2>
+    {% if records %}
+    <table border="1" cellpadding="10" style="width:100%; background:white; border-collapse:collapse;">
+        <tr style="background:#1f2933; color:white;">
+            <th>Subject</th>
+            <th>Internal</th>
+            <th>External</th>
+            <th>Total</th>
+            <th>Semester</th>
+        </tr>
+        {% for r in records %}
+        <tr>
+            <td>{{ r[0] }}</td>
+            <td>{{ r[1] }}</td>
+            <td>{{ r[2] }}</td>
+            <td>{{ r[3] }}</td>
+            <td>{{ r[4] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p style="color:#64748b;">No marks are available yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
