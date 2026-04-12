@@ -1,0 +1,45 @@
+{% extends "base_student.html" %}
+{% block content %}
+<style>
+    .page-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .mentor-box {
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        border-radius: 14px;
+        padding: 16px;
+        margin-top: 18px;
+    }
+
+    .action-link {
+        display: inline-block;
+        margin-top: 16px;
+        padding: 10px 14px;
+        background: #22313f;
+        color: #ffffff;
+        border-radius: 10px;
+        text-decoration: none;
+    }
+</style>
+
+<div class="page-card">
+    <h2 style="margin-top: 0;">Mentor</h2>
+    <p style="color: #64748b;">Mentor and faculty guidance page for your academics section.</p>
+
+    {% if mentor_faculty %}
+    <div class="mentor-box">
+        <strong>Assigned Faculty</strong><br>
+        {{ mentor_faculty.username }}<br>
+        <span style="color:#64748b;">{{ student.course_type }} / {{ student.branch }} / Year {{ student.year }}</span>
+    </div>
+    <a class="action-link" href="{{ url_for('faculty_connect', faculty_id=mentor_faculty.admin_id) }}">Open Faculty Connect</a>
+    {% else %}
+    <p style="color: #64748b;">No mentor has been assigned yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
