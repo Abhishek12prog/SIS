@@ -133,7 +133,108 @@ def ensure_faculty_feature_tables():
         )
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS faculty_subject_assignments (
+            id INT NOT NULL AUTO_INCREMENT,
+            faculty_id INT NOT NULL,
+            subject_name VARCHAR(150) NOT NULL,
+            branch VARCHAR(50) NOT NULL,
+            semester INT NOT NULL,
+            course_type VARCHAR(20) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY faculty_id (faculty_id),
+            CONSTRAINT faculty_subject_assignments_ibfk_1
+                FOREIGN KEY (faculty_id) REFERENCES admin (admin_id)
+                ON DELETE CASCADE
+        )
+    """)
+
     db.commit()
+    cur.close()
+    db.close()
+
+
+def infer_course_type_for_branch(branch_name):
+    branch_value = (branch_name or '').strip().upper()
+    if branch_value in ['BCA', 'BSC']:
+        return branch_value
+    return 'BTECH'
+
+
+def ensure_sample_faculty_and_assignments():
+    db = get_db_connection()
+    if db is None:
+        return
+
+    cur = db.cursor(dictionary=True)
+
+    cur.execute("""
+        SELECT admin_id, username
+        FROM admin
+        WHERE LOWER(username) != 'admin'
+        ORDER BY admin_id
+    """)
+    faculty_rows = cur.fetchall()
+
+    if not faculty_rows:
+        sample_faculty = [
+            ('faculty_cse', 'faculty123'),
+            ('faculty_ece', 'faculty123'),
+            ('faculty_bca', 'faculty123'),
+            ('faculty_bsc', 'faculty123')
+        ]
+        insert_cur = db.cursor()
+        for username, password in sample_faculty:
+            insert_cur.execute("""
+                INSERT INTO admin (username, password)
+                SELECT %s, %s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM admin WHERE UPPER(username)=UPPER(%s)
+                )
+            """, (username, password, username))
+        db.commit()
+        insert_cur.close()
+
+        cur.execute("""
+            SELECT admin_id, username
+            FROM admin
+            WHERE LOWER(username) != 'admin'
+            ORDER BY admin_id
+        """)
+        faculty_rows = cur.fetchall()
+
+    cur.execute("SELECT COUNT(*) AS total FROM faculty_subject_assignments")
+    assignment_count = (cur.fetchone() or {}).get('total', 0)
+
+    if assignment_count == 0 and faculty_rows:
+        cur.execute("""
+            SELECT DISTINCT subject_name, branch, semester
+            FROM subjects
+            WHERE subject_name IS NOT NULL AND branch IS NOT NULL AND semester IS NOT NULL
+            ORDER BY branch, semester, subject_name
+        """)
+        subjects = cur.fetchall()
+
+        if subjects:
+            insert_cur = db.cursor()
+            for index, subject in enumerate(subjects):
+                faculty = faculty_rows[index % len(faculty_rows)]
+                branch_name = (subject.get('branch') or '').strip().upper()
+                insert_cur.execute("""
+                    INSERT INTO faculty_subject_assignments
+                    (faculty_id, subject_name, branch, semester, course_type)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    faculty['admin_id'],
+                    subject['subject_name'],
+                    branch_name,
+                    subject['semester'],
+                    infer_course_type_for_branch(branch_name)
+                ))
+            db.commit()
+            insert_cur.close()
+
     cur.close()
     db.close()
 
@@ -272,6 +373,7 @@ def get_logged_in_student():
 
 
 ensure_faculty_feature_tables()
+ensure_sample_faculty_and_assignments()
 ensure_exam_seating_tables()
 
 
@@ -2401,40 +2503,49 @@ def courses():
         return redirect(url_for('student_login'))
 
     db = get_db_connection()
+    if db is None:
+        return "Database connection failed"
+
     cur = db.cursor(dictionary=True)
 
-    # ✅ Get student details (UPDATED)
     cur.execute("""
-        SELECT branch, joining_year, course_type 
+        SELECT branch, joining_year, course_type, year, semester
         FROM students WHERE student_id=%s
     """, (session['student_id'],))
 
     student = cur.fetchone()
+    if not student:
+        cur.close()
+        db.close()
+        return redirect(url_for('student_login'))
 
-    branch = student['branch']
+    branch = (student.get('branch') or '').strip().upper()
+    course_type = (student.get('course_type') or '').strip().upper()
+    joining_year = student.get('joining_year')
 
-    # ✅ Calculate semester (NEW LOGIC)
-    sem = calculate_semester(
-        student['joining_year'],
-        student['course_type']
-    )
-
-    print("DEBUG -> Branch:", branch)
-    print("DEBUG -> Semester:", sem)
-
-    # ✅ CORE LOGIC (same but cleaner)
-    if sem in [1, 2]:
-        query_branch = 'ALL'
+    if joining_year:
+        sem = calculate_semester(joining_year, course_type)
     else:
-        query_branch = branch
+        sem = student.get('semester') or 1
 
-    cur.execute("""
-        SELECT subject_name 
-        FROM subjects 
-        WHERE branch=%s AND semester=%s
-    """, (query_branch, sem))
+    subject_branches = []
+    if course_type == 'BTECH' and sem in [1, 2]:
+        subject_branches = ['ALL']
+    elif branch:
+        subject_branches = [branch]
+    elif course_type:
+        subject_branches = [course_type]
 
-    subjects = cur.fetchall()
+    subjects = []
+    for subject_branch in subject_branches:
+        cur.execute("""
+            SELECT subject_name, branch, semester
+            FROM subjects
+            WHERE UPPER(branch)=%s AND semester=%s
+            ORDER BY subject_name
+        """, (subject_branch, sem))
+        subjects.extend(cur.fetchall())
+
     cur.close()
     db.close()
 
@@ -2450,7 +2561,78 @@ def faculty():
     if 'student_id' not in session:
         return redirect(url_for('student_login'))
 
-    return redirect(url_for('faculty_connect'))
+    return redirect(url_for('my_faculty'))
+
+
+@app.route('/my_faculty')
+def my_faculty():
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    if db is None:
+        return "Database connection failed"
+
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT student_id, name, branch, joining_year, course_type, semester
+        FROM students
+        WHERE student_id=%s
+    """, (session['student_id'],))
+    student = cur.fetchone()
+    if not student:
+        cur.close()
+        db.close()
+        return redirect(url_for('student_login'))
+
+    branch = (student.get('branch') or '').strip().upper()
+    course_type = (student.get('course_type') or '').strip().upper()
+    joining_year = student.get('joining_year')
+    if joining_year:
+        current_sem = calculate_semester(joining_year, course_type)
+    else:
+        current_sem = student.get('semester') or 1
+
+    subject_branch = 'ALL' if course_type == 'BTECH' and current_sem in [1, 2] else branch
+    cur.execute("""
+        SELECT subject_name, branch, semester
+        FROM subjects
+        WHERE UPPER(branch)=%s AND semester=%s
+        ORDER BY subject_name
+    """, (subject_branch, current_sem))
+    subject_rows = cur.fetchall()
+
+    subject_faculty_rows = []
+    for subject in subject_rows:
+        cur.execute("""
+            SELECT fsa.subject_name, a.admin_id, a.username
+            FROM faculty_subject_assignments fsa
+            JOIN admin a ON a.admin_id = fsa.faculty_id
+            WHERE UPPER(fsa.branch)=%s
+              AND fsa.semester=%s
+              AND fsa.subject_name=%s
+            LIMIT 1
+        """, (
+            (subject.get('branch') or '').strip().upper(),
+            subject.get('semester'),
+            subject.get('subject_name')
+        ))
+        faculty_row = cur.fetchone()
+        subject_faculty_rows.append({
+            'subject_name': subject.get('subject_name'),
+            'faculty_id': faculty_row['admin_id'] if faculty_row else None,
+            'faculty_name': faculty_row['username'] if faculty_row else 'Not Assigned'
+        })
+
+    cur.close()
+    db.close()
+
+    return render_template(
+        'student_my_faculty.html',
+        student=student,
+        current_sem=current_sem,
+        subject_faculty_rows=subject_faculty_rows
+    )
 
 
 @app.route('/attendance')
