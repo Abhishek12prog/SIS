@@ -29,7 +29,6 @@ def calculate_semester(joining_year, course_type):
     else:
         return min(max(sem, 1), 6)
 
-
 # ================= FLASK APP =================
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.getenv("SECRET_KEY", "fallback_key")
@@ -502,6 +501,24 @@ def remove_duplicate_students(students, seen_student_ids):
     return unique_students
 
 
+def dedupe_students_by_identity(students):
+    seen_keys = set()
+    unique_students = []
+
+    for student in students:
+        username = (student.get('username') or '').strip().upper()
+        email = (student.get('email') or '').strip().lower()
+        key = username or email or f"student_id:{student.get('student_id')}"
+
+        if key in seen_keys:
+            continue
+
+        seen_keys.add(key)
+        unique_students.append(student)
+
+    return unique_students
+
+
 def build_seat_positions(total_seats, columns_count):
     columns = max(columns_count or 6, 1)
     positions = []
@@ -555,6 +572,18 @@ def dedupe_allocation_students(students):
         seen_student_ids.add(student_id)
         unique_students.append(student)
     return unique_students
+
+
+def dedupe_allocations_by_student(allocations):
+    seen_student_ids = set()
+    unique_allocations = []
+    for allocation in allocations:
+        student_id = allocation.get('student_id')
+        if student_id in seen_student_ids:
+            continue
+        seen_student_ids.add(student_id)
+        unique_allocations.append(allocation)
+    return unique_allocations
 
 
 def sanitize_filename(value):
@@ -650,6 +679,7 @@ def generate_seating_allocations(classrooms, grouped_students, exam_datetime, ro
 
     allocations = []
     student_index = 0
+    allocated_student_ids = set()
 
     for room in classrooms:
         seat_positions = build_seat_positions(room['total_seats'], room.get('columns_count'))
@@ -658,8 +688,15 @@ def generate_seating_allocations(classrooms, grouped_students, exam_datetime, ro
                 break
 
             student = ordered_students[student_index]
+            student_index += 1
+
+            student_id = student.get('student_id')
+            if student_id in allocated_student_ids:
+                continue
+
+            allocated_student_ids.add(student_id)
             allocations.append({
-                'student_id': student['student_id'],
+                'student_id': student_id,
                 'classroom_id': room['id'],
                 'subject_name': student['subject_name'],
                 'room_number': room['room_number'],
@@ -672,7 +709,6 @@ def generate_seating_allocations(classrooms, grouped_students, exam_datetime, ro
                 'room_visible_at': room_visible_at,
                 'seat_visible_at': seat_visible_at
             })
-            student_index += 1
 
     return allocations, None
 
@@ -977,7 +1013,7 @@ def students():
             ORDER BY course_type, joining_year, year, branch, name
         """, tuple(params))
 
-        students = cur.fetchall()
+        students = dedupe_students_by_identity(cur.fetchall())
 
         raw_grouped_students = {}
         for student in students:
@@ -1084,6 +1120,21 @@ def add_student():
         try:
             db = get_db_connection()
             cur = db.cursor()
+            username = request.form['username'].strip()
+            email = request.form['email'].strip()
+
+            cur.execute("""
+                SELECT student_id
+                FROM students
+                WHERE UPPER(username)=UPPER(%s) OR LOWER(email)=LOWER(%s)
+                LIMIT 1
+            """, (username, email))
+            existing_student = cur.fetchone()
+
+            if existing_student:
+                cur.close()
+                db.close()
+                return "Student with the same username or email already exists."
 
             cur.execute("""
                 INSERT INTO students 
@@ -1091,13 +1142,13 @@ def add_student():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 request.form['name'],
-                request.form['email'],
+                email,
                 request.form['branch'],
                 int(request.form['year']),          # ✅ changed
                 int(request.form['semester']),      # ✅ added
                 request.form['course_type'],
                 request.form['phone'],              # ✅ added
-                request.form['username'],
+                username,
                 request.form['password']
             ))
 
@@ -1240,7 +1291,19 @@ def edit_student(student_id):
         course_type = request.form.get('course_type')
         phone = request.form.get('phone')
 
-        print(request.form)   # 🔍 DEBUG
+        cur.execute("""
+            SELECT student_id
+            FROM students
+            WHERE student_id != %s
+              AND (UPPER(username)=UPPER(%s) OR LOWER(email)=LOWER(%s))
+            LIMIT 1
+        """, (student_id, username, email))
+        existing_student = cur.fetchone()
+
+        if existing_student:
+            cur.close()
+            db.close()
+            return "Another student already uses this username or email."
 
         cur.execute("""
             UPDATE students
@@ -1292,6 +1355,82 @@ def view_student(student_id):
     db.close()
 
     return render_template('admin_view_student.html', student=student)
+
+
+@app.route('/cleanup_duplicate_students')
+def cleanup_duplicate_students():
+    if 'admin' not in session:
+        return redirect(url_for('admin_login'))
+
+    db = get_db_connection()
+    if db is None:
+        return "Database connection failed"
+
+    cur = db.cursor(dictionary=True)
+
+    cur.execute("""
+        SELECT username
+        FROM students
+        WHERE username IS NOT NULL AND TRIM(username) != ''
+        GROUP BY username
+        HAVING COUNT(*) > 1
+    """)
+    duplicate_usernames = [row['username'] for row in cur.fetchall()]
+
+    if not duplicate_usernames:
+        cur.close()
+        db.close()
+        return redirect(url_for('students'))
+
+    meta_cur = db.cursor(dictionary=True)
+    meta_cur.execute("""
+        SELECT TABLE_NAME, COLUMN_NAME
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+          AND REFERENCED_TABLE_NAME = 'students'
+          AND REFERENCED_COLUMN_NAME = 'student_id'
+    """)
+    reference_rows = meta_cur.fetchall()
+    meta_cur.close()
+
+    updated_tables = []
+
+    for username in duplicate_usernames:
+        cur.execute("""
+            SELECT student_id
+            FROM students
+            WHERE username=%s
+            ORDER BY student_id
+        """, (username,))
+        student_ids = [row['student_id'] for row in cur.fetchall()]
+        if len(student_ids) <= 1:
+            continue
+
+        keep_student_id = student_ids[0]
+        duplicate_ids = student_ids[1:]
+
+        for duplicate_id in duplicate_ids:
+            for ref in reference_rows:
+                table_name = ref['TABLE_NAME']
+                column_name = ref['COLUMN_NAME']
+
+                if table_name == 'students':
+                    continue
+
+                cur.execute(f"""
+                    UPDATE {table_name}
+                    SET {column_name}=%s
+                    WHERE {column_name}=%s
+                """, (keep_student_id, duplicate_id))
+                updated_tables.append(table_name)
+
+            cur.execute("DELETE FROM students WHERE student_id=%s", (duplicate_id,))
+
+    db.commit()
+    cur.close()
+    db.close()
+
+    return redirect(url_for('students'))
 # ================= DOCUMENTS =================
 @app.route('/documents')
 def documents():
@@ -1687,7 +1826,11 @@ def seating():
                                 ))
                                 generated_plan_id = cur.lastrowid
 
+                                inserted_student_ids = set()
                                 for allocation in allocations:
+                                    if allocation['student_id'] in inserted_student_ids:
+                                        continue
+                                    inserted_student_ids.add(allocation['student_id'])
                                     cur.execute("""
                                         INSERT INTO exam_seating_allocations
                                         (plan_id, student_id, classroom_id, subject_name, room_number, seat_number, seat_label,
@@ -1766,7 +1909,7 @@ def seating():
                     WHERE a.plan_id=%s
                     ORDER BY a.room_number, a.seat_number
                 """, (plan_id,))
-                plan_allocations = cur.fetchall()
+                plan_allocations = dedupe_allocations_by_student(cur.fetchall())
 
                 cur.execute("""
                     SELECT room_number, COUNT(*) AS allocated_students
@@ -1953,7 +2096,7 @@ def seating_group_pdf(plan_id):
         WHERE a.plan_id=%s AND a.group_label=%s
         ORDER BY a.room_number, a.seat_number
     """, (plan_id, group_label))
-    allocations = cur.fetchall()
+    allocations = dedupe_allocations_by_student(cur.fetchall())
     cur.close()
     db.close()
 
@@ -2234,7 +2377,22 @@ def my_info():
 
 @app.route('/registration')
 def registration():
-    return render_template('student_academics.html')
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT student_id, name, email, branch, username, year, semester,
+               joining_year, course_type, phone
+        FROM students
+        WHERE student_id=%s
+    """, (session['student_id'],))
+    student = cur.fetchone()
+    cur.close()
+    db.close()
+
+    return render_template('student_registration.html', student=student)
 
 
 @app.route('/courses')
@@ -2297,27 +2455,121 @@ def faculty():
 
 @app.route('/attendance')
 def attendance():
-    return render_template('student_academics.html')
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT student_id, name, branch, year, semester, course_type
+        FROM students
+        WHERE student_id=%s
+    """, (session['student_id'],))
+    student = cur.fetchone()
+    cur.close()
+    db.close()
+
+    return render_template('student_attendance.html', student=student)
 
 
 @app.route('/resources')
 def resources():
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
     return render_template('student_resources.html')
 
 
 @app.route('/mentor')
 def mentor():
-    return render_template('student_academics.html')
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT student_id, name, branch, year, semester, course_type
+        FROM students
+        WHERE student_id=%s
+    """, (session['student_id'],))
+    student = cur.fetchone()
+
+    cur.execute("""
+        SELECT admin_id, username
+        FROM admin
+        ORDER BY username
+        LIMIT 1
+    """)
+    mentor_faculty = cur.fetchone()
+    cur.close()
+    db.close()
+
+    return render_template('student_mentor.html', student=student, mentor_faculty=mentor_faculty)
 
 
 @app.route('/marks')
 def marks():
-    return render_template('student_academics.html')
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        SELECT subject_name, internal_marks, external_marks, total_marks, semester
+        FROM academics
+        WHERE student_id=%s
+        ORDER BY semester, subject_name
+    """, (session['student_id'],))
+    records = cur.fetchall()
+    cur.close()
+    db.close()
+
+    return render_template('student_marks.html', records=records)
 
 
 @app.route('/grades')
 def grades():
-    return render_template('student_academics.html')
+    if 'student_id' not in session:
+        return redirect(url_for('student_login'))
+
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("""
+        SELECT subject_name, total_marks, semester
+        FROM academics
+        WHERE student_id=%s
+        ORDER BY semester, subject_name
+    """, (session['student_id'],))
+    rows = cur.fetchall()
+    cur.close()
+    db.close()
+
+    grade_rows = []
+    for subject_name, total_marks, semester in rows:
+        marks_value = total_marks or 0
+        if marks_value >= 90:
+            grade = 'O'
+        elif marks_value >= 80:
+            grade = 'A+'
+        elif marks_value >= 70:
+            grade = 'A'
+        elif marks_value >= 60:
+            grade = 'B+'
+        elif marks_value >= 50:
+            grade = 'B'
+        elif marks_value >= 40:
+            grade = 'C'
+        else:
+            grade = 'F'
+
+        grade_rows.append({
+            'subject_name': subject_name,
+            'total_marks': marks_value,
+            'semester': semester,
+            'grade': grade
+        })
+
+    return render_template('student_grades.html', grade_rows=grade_rows)
 
 @app.route('/student_documents')
 def student_documents():
