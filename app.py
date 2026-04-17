@@ -1470,69 +1470,67 @@ def cleanup_duplicate_students():
 
     cur = db.cursor(dictionary=True)
 
-    cur.execute("""
-        SELECT username
-        FROM students
-        WHERE username IS NOT NULL AND TRIM(username) != ''
-        GROUP BY username
-        HAVING COUNT(*) > 1
-    """)
-    duplicate_usernames = [row['username'] for row in cur.fetchall()]
+    try:
+        cur.execute("""
+            SELECT LOWER(TRIM(username)) AS username_key
+            FROM students
+            WHERE username IS NOT NULL AND TRIM(username) != ''
+            GROUP BY LOWER(TRIM(username))
+            HAVING COUNT(*) > 1
+        """)
+        duplicate_keys = [row['username_key'] for row in cur.fetchall() if row.get('username_key')]
 
-    if not duplicate_usernames:
+        if not duplicate_keys:
+            return redirect(url_for('students'))
+
+        meta_cur = db.cursor(dictionary=True)
+        meta_cur.execute("""
+            SELECT DISTINCT TABLE_NAME, COLUMN_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+              AND REFERENCED_TABLE_NAME = 'students'
+              AND REFERENCED_COLUMN_NAME = 'student_id'
+              AND TABLE_NAME != 'students'
+        """)
+        reference_rows = meta_cur.fetchall()
+        meta_cur.close()
+
+        for username_key in duplicate_keys:
+            cur.execute("""
+                SELECT student_id
+                FROM students
+                WHERE LOWER(TRIM(username))=%s
+                ORDER BY student_id
+            """, (username_key,))
+            student_ids = [row['student_id'] for row in cur.fetchall()]
+
+            if len(student_ids) <= 1:
+                continue
+
+            keep_student_id = student_ids[0]
+            duplicate_ids = student_ids[1:]
+
+            for duplicate_id in duplicate_ids:
+                for ref in reference_rows:
+                    table_name = ref['TABLE_NAME']
+                    column_name = ref['COLUMN_NAME']
+
+                    cur.execute(
+                        f"UPDATE `{table_name}` SET `{column_name}`=%s WHERE `{column_name}`=%s",
+                        (keep_student_id, duplicate_id)
+                    )
+
+                cur.execute("DELETE FROM students WHERE student_id=%s", (duplicate_id,))
+
+        db.commit()
+        return redirect(url_for('students'))
+    except mysql.connector.Error as e:
+        db.rollback()
+        print("DUPLICATE CLEANUP ERROR:", e)
+        return "Unable to remove duplicate students right now. Please check server logs for details.", 500
+    finally:
         cur.close()
         db.close()
-        return redirect(url_for('students'))
-
-    meta_cur = db.cursor(dictionary=True)
-    meta_cur.execute("""
-        SELECT TABLE_NAME, COLUMN_NAME
-        FROM information_schema.KEY_COLUMN_USAGE
-        WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
-          AND REFERENCED_TABLE_NAME = 'students'
-          AND REFERENCED_COLUMN_NAME = 'student_id'
-    """)
-    reference_rows = meta_cur.fetchall()
-    meta_cur.close()
-
-    updated_tables = []
-
-    for username in duplicate_usernames:
-        cur.execute("""
-            SELECT student_id
-            FROM students
-            WHERE username=%s
-            ORDER BY student_id
-        """, (username,))
-        student_ids = [row['student_id'] for row in cur.fetchall()]
-        if len(student_ids) <= 1:
-            continue
-
-        keep_student_id = student_ids[0]
-        duplicate_ids = student_ids[1:]
-
-        for duplicate_id in duplicate_ids:
-            for ref in reference_rows:
-                table_name = ref['TABLE_NAME']
-                column_name = ref['COLUMN_NAME']
-
-                if table_name == 'students':
-                    continue
-
-                cur.execute(f"""
-                    UPDATE {table_name}
-                    SET {column_name}=%s
-                    WHERE {column_name}=%s
-                """, (keep_student_id, duplicate_id))
-                updated_tables.append(table_name)
-
-            cur.execute("DELETE FROM students WHERE student_id=%s", (duplicate_id,))
-
-    db.commit()
-    cur.close()
-    db.close()
-
-    return redirect(url_for('students'))
 # ================= DOCUMENTS =================
 @app.route('/documents')
 def documents():
