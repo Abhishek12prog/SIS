@@ -303,14 +303,15 @@ CREATE TABLE `students` (
   `name` varchar(100) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `branch` varchar(50) DEFAULT NULL,
-  `username` varchar(50) DEFAULT NULL,
+  `username` varchar(50) NOT NULL,
   `password` varchar(50) DEFAULT NULL,
   `year` int DEFAULT NULL,
   `semester` int DEFAULT NULL,
   `joining_year` int DEFAULT NULL,
   `course_type` varchar(20) DEFAULT NULL,
   `phone` varchar(15) DEFAULT NULL,
-  PRIMARY KEY (`student_id`)
+  PRIMARY KEY (`student_id`),
+  UNIQUE KEY `uq_students_username` (`username`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
