@@ -223,7 +223,6 @@
     <div class="students-toolbar-actions">
         <button type="submit">Apply Filters</button>
         <a href="{{ url_for('students') }}">Reset</a>
-        <a href="{{ url_for('cleanup_duplicate_students') }}" onclick="return confirm('Delete duplicate student entries and keep the oldest record for each username?')">Remove Duplicates</a>
     </div>
 </form>
 
