@@ -1078,6 +1078,7 @@ def students():
         selected_batch = request.args.get('batch', type=int)
         selected_year = request.args.get('year', type=int)
         selected_branch = request.args.get('branch', '').strip().upper()
+        cleanup_status = request.args.get('cleanup_status', '').strip().lower()
 
         cur = db.cursor(dictionary=True)
 
@@ -1206,7 +1207,8 @@ def students():
             selected_batch=selected_batch,
             selected_year=selected_year,
             selected_branch=selected_branch,
-            search=search
+            search=search,
+            cleanup_status=cleanup_status
         )
 
     except Exception as e:
@@ -1469,6 +1471,16 @@ def cleanup_duplicate_students():
         return "Database connection failed"
 
     cur = db.cursor(dictionary=True)
+    student_reference_tables = [
+        ('academics', 'student_id'),
+        ('exam_subjects', 'student_id'),
+        ('feedback', 'student_id'),
+        ('fees', 'student_id'),
+        ('helpdesk', 'student_id'),
+        ('faculty_chat_messages', 'student_id'),
+        ('faculty_meeting_requests', 'student_id'),
+        ('exam_seating_allocations', 'student_id')
+    ]
 
     try:
         cur.execute("""
@@ -1481,19 +1493,7 @@ def cleanup_duplicate_students():
         duplicate_keys = [row['username_key'] for row in cur.fetchall() if row.get('username_key')]
 
         if not duplicate_keys:
-            return redirect(url_for('students'))
-
-        meta_cur = db.cursor(dictionary=True)
-        meta_cur.execute("""
-            SELECT DISTINCT TABLE_NAME, COLUMN_NAME
-            FROM information_schema.KEY_COLUMN_USAGE
-            WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
-              AND REFERENCED_TABLE_NAME = 'students'
-              AND REFERENCED_COLUMN_NAME = 'student_id'
-              AND TABLE_NAME != 'students'
-        """)
-        reference_rows = meta_cur.fetchall()
-        meta_cur.close()
+            return redirect(url_for('students', cleanup_status='none'))
 
         for username_key in duplicate_keys:
             cur.execute("""
@@ -1511,10 +1511,7 @@ def cleanup_duplicate_students():
             duplicate_ids = student_ids[1:]
 
             for duplicate_id in duplicate_ids:
-                for ref in reference_rows:
-                    table_name = ref['TABLE_NAME']
-                    column_name = ref['COLUMN_NAME']
-
+                for table_name, column_name in student_reference_tables:
                     cur.execute(
                         f"UPDATE `{table_name}` SET `{column_name}`=%s WHERE `{column_name}`=%s",
                         (keep_student_id, duplicate_id)
@@ -1523,11 +1520,11 @@ def cleanup_duplicate_students():
                 cur.execute("DELETE FROM students WHERE student_id=%s", (duplicate_id,))
 
         db.commit()
-        return redirect(url_for('students'))
-    except mysql.connector.Error as e:
+        return redirect(url_for('students', cleanup_status='success'))
+    except Exception as e:
         db.rollback()
         print("DUPLICATE CLEANUP ERROR:", e)
-        return "Unable to remove duplicate students right now. Please check server logs for details.", 500
+        return redirect(url_for('students', cleanup_status='failed'))
     finally:
         cur.close()
         db.close()
